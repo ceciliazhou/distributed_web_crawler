@@ -7,7 +7,7 @@ class Frontier(Thread):
 	A Frontier maintains URLs in two queues: front queue (used for input) and back queue (used for output).
 	when put() is called, url is accepted and pushed into front queue directly. 
 	There is a house-keeping thread which keeps moving url from the front queue to the back queue, if only the url is validate. 
-	A url is considered validate if and only if all the registered validation functions produce True on it and the url hasn't been visited before.
+	A url is considered validate if and only if all the registered eliminator functions produce False on it and the url hasn't been visited before.
 	Everytime get() is called, an url is popped out from back queue.	
 	"""
 	
@@ -24,8 +24,8 @@ class Frontier(Thread):
 
 	def register(self, eliminateFunc):
 		"""
-		Register a validation function. 
-		A validation function must take in a url and returns a bool to indicate whether the url is considered valid.
+		Register a eliminator function. 
+		A eliminator function must take in a url and returns a bool to indicate whether the url should be eliminated.
 		"""
 		self._eliminators.append(eliminateFunc)
 

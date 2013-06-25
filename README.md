@@ -37,6 +37,6 @@ This is a simple web crawler. It downloads and parses web pages starting with a 
 		Frontier maintains urls in two queues: frontQ (input) and backQ (output)
 		1. url is accepted and pushed into frontQ directly, when put() is called.
 		2. A house-keeping thread keeps moving url out from frontQ. 
-		If the url is considered validate by all registered validators, it will be pushed into backQ, otherwise, it will be discard.
+		If the url is considered disallowed by any of the registered eliminators or the duplicate eliminator, it will be discard. Otherwise, it will be pushed into backQ.
 		3. url is popped out from backQ, when get() is called.
 	
