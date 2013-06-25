@@ -1,4 +1,4 @@
-import urllib2
+# import urllib2
 import hashlib
 
 class Page(object):
@@ -15,20 +15,23 @@ class Page(object):
 		"""
 		super(Page, self).__init__()
 		self._url = url
-		request = urllib2.Request(url)
-		self._host = request.get_host()
-		self._scheme = request.get_type()
-		self._path = request.get_selector()
+		# request = urllib2.Request(url)
+		# self._host = request.get_host()
+		# self._scheme = request.get_type()
+		# self._path = request.get_selector()
 		self._content = content
 
-	def getHost(self):
-		return self._host
+	def getURL(self):
+		return self._url
 
-	def getScheme(self):
-		return self._scheme
+	# def getHost(self):
+	# 	return self._host
 
-	def getPath(self):
-		return self._path
+	# def getScheme(self):
+	# 	return self._scheme
+
+	# def getPath(self):
+	# 	return self._path
 
 	def getContent(self):
 		return self._content
@@ -41,6 +44,6 @@ class Page(object):
 	# def __eq__(self, other):
 	# 	return self._url == other._url
 
-	def __str__(self):
-		return "URL: %s\nHOST: %s\nSCHEME: %s\nPATH: %s" % (self._url, self._host, self._scheme, self._path)
+	# def __str__(self):
+	# 	return "URL: %s\nHOST: %s\nSCHEME: %s\nPATH: %s" % (self._url, self._host, self._scheme, self._path)
 

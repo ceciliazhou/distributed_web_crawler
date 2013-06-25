@@ -1,11 +1,11 @@
-from Queue import Queue
 import os
 import logging
 from datetime import datetime
+from Queue import Queue
 
 from downloader import Downloader
 from parser import Parser
-from validator import URLValidator
+from frontier import Frontier
 
 class Engine(object):
 	"""
@@ -28,7 +28,7 @@ class Engine(object):
 		None.
 		"""
 		super(Engine, self).__init__()
-		self._urlQ = Queue()
+		self._urlQ = Frontier()
 		self._pageQ = Queue()
 		for seed in seeds:
 			self._urlQ.put(seed)
@@ -42,10 +42,9 @@ class Engine(object):
 		parseLogger.addHandler(logging.FileHandler(os.path.abspath("log/parser.log")))
 		parseLogger.setLevel(logging.INFO)
 				
-		self._validator = URLValidator()
 		self._downloaders = []
 		for i in range(nDownloader):
-			self._downloaders.append(Downloader(self._urlQ, self._pageQ, self._validator, downloadLogger))
+			self._downloaders.append(Downloader(self._urlQ, self._pageQ, downloadLogger))
 		self._parsers = []
 		for i in range(nParser):
 			self._parsers.append(Parser(self._pageQ, self._urlQ, parseLogger))
@@ -56,6 +55,7 @@ class Engine(object):
 		Start crawling.
 		"""
 		print "[%s] : Crawler is started!" % datetime.now()
+		self._urlQ.start()
 		for downloader in self._downloaders:
 			downloader.start()
 		for parser in self._parsers:
@@ -65,11 +65,12 @@ class Engine(object):
 		"""
 		Stop crawling.
 		"""
+		self._urlQ.stop()
 		for downloader in self._downloaders:
 			downloader.stop()
 		for parser in self._parsers:
 			parser.stop()
 		print "[%s] : Crawler is stopped!" %datetime.now()
-		print self._validator.countDownloadedPages(), " pages downloaded!"
+		print self._urlQ.countDownloadedPages(), " pages downloaded!"
 
 

@@ -18,7 +18,7 @@ class Downloader(Thread):
 	A Downloader is a thread that keeps downloading web pages until it's stopped.
 	"""
 
-	def __init__(self, urlQ, pageQ, urlValidator = None, logger = None, userAgent = DEFAULT_USER_AGENT):
+	def __init__(self, urlQ, pageQ, logger = None, userAgent = DEFAULT_USER_AGENT):
 		"""
 		Initialize a Downloader.
 		---------  Param --------
@@ -26,8 +26,6 @@ class Downloader(Thread):
 			A queue storing the urls from which web pages are to be downloaded.
 		pageQ: (Queue)  		
 			A queue used for the downloader to store the downloaded pages.
-		urlValidator: (URLValidator) 
-			Used to check whether a url should be downloaded.
 		logger: (logging.Logger)
 			A logger used to log info/warning/error about downloading.
 		userAgent: (str) 
@@ -39,7 +37,6 @@ class Downloader(Thread):
 		super(Downloader, self).__init__()
 		self._urlQ = urlQ
 		self._pageQ = pageQ
-		self._urlValidator = urlValidator
 		self._userAgent = userAgent
 		self._stopEvent = Event()
 		self._logger = logger
@@ -85,18 +82,15 @@ class Downloader(Thread):
 		while(not self._stopEvent.is_set()):
 			try:
 				url = self._urlQ.get(timeout = 2)
-				if self._urlValidator and self._urlValidator.validate(url):
-					page = self.download(url)
-					# index += 1
-					# page = page if page else ""
-					# temp.write(page)
-					# temp.close()
-					# print page
-					if page and (not self._pageQ.full()):
-						self._pageQ.put(page, timeout = 2)
-				else:
-					self.log(logging.WARNING, "already visited: " + url)
-
+				page = self.download(url)
+				# index += 1
+				# page = page if page else ""
+				# temp.write(page)
+				# temp.close()
+				# print page
+				if page and (not self._pageQ.full()):
+					self._pageQ.put(page, timeout = 2)
+			
 			except Empty:
 				self.log(logging.WARNING, "urlQ is empty") 
 			except Full:

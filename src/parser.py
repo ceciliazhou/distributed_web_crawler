@@ -2,6 +2,8 @@ from bs4 import BeautifulSoup
 from Queue import Queue, Empty, Full
 from threading import Thread, Event
 from datetime import datetime 
+from urlparse import urljoin
+
 import os
 import logging 
 from page import Page
@@ -59,8 +61,10 @@ class Parser(Thread):
 					# if url.startswith('/'):
 					# 	url = site + url
 					# TO BE DONE
-					if url.startswith("http"):
-						links.append(url)
+					# if url.startswith("http"):
+						# links.append(url)
+					url = urljoin(page.getURL(), url)
+					links.append(url)
 		except:
 			self.log(logging.WARNING, "Unable to parse " + page)
 		return links
