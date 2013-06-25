@@ -1,6 +1,6 @@
 This is a simple web crawler. It downloads and parses web pages starting with a given set of web sites which is called seeds. 
 
-###Usage:###
+###Usage:
 	
 	python crawler.py [options]
 	
@@ -18,7 +18,7 @@ This is a simple web crawler. It downloads and parses web pages starting with a 
 		number of threads which parse web pages to extract links
 
 	
-###Desgin:###
+###Desgin:
 	
 	Engine
 		The main component of a crawler. The job of an engine consists of:

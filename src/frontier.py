@@ -19,17 +19,17 @@ class Frontier(Thread):
 		self._frontQ = Queue()
 		self._backQ = Queue()
 		self._stopEvent = Event()
-		self._validators = []
+		self._eliminators = []
 		self._urlDupEliminator = DupEliminator()
 
-	def register(self, validateFunc):
+	def register(self, eliminateFunc):
 		"""
 		Register a validation function. 
 		A validation function must take in a url and returns a bool to indicate whether the url is considered valid.
 		"""
-		self._validators.append(validateFunc)
+		self._eliminators.append(eliminateFunc)
 
-	def __validate(self, url):
+	def __elim(self, url):
 		"""
 		Check if a given url should be visited.
 		---------  Param --------
@@ -38,15 +38,15 @@ class Frontier(Thread):
 		---------  Return --------
 		(bool): True if url should be visited, false otherwise.
 		"""
-		for validateFunc in self._validators:
-			if(not validateFunc(url)):
-				return False
-		return True
+		for eliminateFunc in self._eliminators:
+			if(eliminateFunc(url)):
+				return True
+		return self._urlDupEliminator.visitedBefore(url)
 
 	def run(self):
 		while(not self._stopEvent.is_set()):
 			url = self._frontQ.get(timeout = 10)
-			if self.__validate(url) and self._urlDupEliminator.notVisited(url):
+			if not self.__elim(url):
 				self._backQ.put(url, timeout = 2)	
 			
 	def stop(self):
@@ -72,7 +72,7 @@ class DupEliminator(object):
 		self._visited = set()
 		self._lock = Lock()
 		
-	def notVisited(self, url):
+	def visitedBefore(self, url):
 		"""
 		Check if a given url has been visited before.
 		---------  Param --------
@@ -83,10 +83,10 @@ class DupEliminator(object):
 		"""
 		self._lock.acquire()
 		try:	
-			notvisited = url not in self._visited
-			if(notvisited):
+			visited = url in self._visited
+			if(not visited):
 				self._visited.add(url)
-			return notvisited
+			return visited
 		finally:
 			self._lock.release() 
 
