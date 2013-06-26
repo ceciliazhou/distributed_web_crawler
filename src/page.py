@@ -13,16 +13,18 @@ class Page(object):
 		SCHEME: http
 		PATH: /software/guile/
 		"""
-		super(Page, self).__init__()
 		self._url = url
+		self._content = content
 		# request = urllib2.Request(url)
 		# self._host = request.get_host()
 		# self._scheme = request.get_type()
 		# self._path = request.get_selector()
-		self._content = content
-
+		
 	def getURL(self):
 		return self._url
+
+	def getContent(self):
+		return self._content
 
 	# def getHost(self):
 	# 	return self._host
@@ -32,9 +34,6 @@ class Page(object):
 
 	# def getPath(self):
 	# 	return self._path
-
-	def getContent(self):
-		return self._content
 		
 	# def __hash__(self):
 	# 	m = hashlib.md5()

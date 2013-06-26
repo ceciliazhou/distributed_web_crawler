@@ -1,26 +1,29 @@
-from Queue import Queue
-from threading import Thread, Event, Lock
+from Queue import Queue, Empty, Full
+from threading import Thread, Lock
+import time
 
 
-class Frontier(Thread):
+class Frontier(object):
 	"""
 	A Frontier maintains URLs in two queues: front queue (used for input) and back queue (used for output).
 	when put() is called, url is accepted and pushed into front queue directly. 
-	There is a house-keeping thread which keeps moving url from the front queue to the back queue, if only the url is validate. 
+	There is a housecleaning thread which keeps moving url from the front queue to the back queue, if only the url is validate. 
 	A url is considered validate if and only if all the registered eliminator functions produce False on it and the url hasn't been visited before.
 	Everytime get() is called, an url is popped out from back queue.	
 	"""
 	
-	def __init__(self):
+	def __init__(self, maxQSize, isDaemon = True):
 		"""
 		Initialize the Frontier object.
 		"""
 		super(Frontier, self).__init__()
-		self._frontQ = Queue()
-		self._backQ = Queue()
-		self._stopEvent = Event()
+		self.daemon = True
+		self._frontQ = Queue(maxQSize)
+		self._backQ = Queue(maxQSize)
 		self._eliminators = []
 		self._urlDupEliminator = DupEliminator()
+		self._lock = Lock()
+		self._housecleanThread = None
 
 	def register(self, eliminateFunc):
 		"""
@@ -43,24 +46,34 @@ class Frontier(Thread):
 				return True
 		return self._urlDupEliminator.visitedBefore(url)
 
-	def run(self):
-		while(not self._stopEvent.is_set()):
-			url = self._frontQ.get(timeout = 10)
-			if not self.__elim(url):
-				self._backQ.put(url, timeout = 2)	
-			
-	def stop(self):
-		self._stopEvent.set()
-		self._urlDupEliminator.dump()
+	def _houseclean(self):
+		try:
+			while(not self._frontQ.empty() and not self._backQ.full()):
+				url = self._frontQ.get(timeout = 10)
+				if not self.__elim(url):
+					self._backQ.put(url, timeout = 2)	
+		except:
+			print "url front Q is empty or back Q is full. should stop the housecleaning thread for a while"
+		finally:
+			self._housecleanThread = None
 
+		
 	def get(self, block = True, timeout = 10):
+		if(self._backQ.empty() and not self._frontQ.empty()):
+			self._lock.acquire()
+			if(not self._housecleanThread):
+				self._housecleanThread = Thread(target = self._houseclean)
+				self._housecleanThread.daemon = True
+				self._housecleanThread.start()
+			self._lock.release()
 		return self._backQ.get(block, timeout)
 
 	def put(self, item, block = True, timeout = 2):
 		return self._frontQ.put(item, block, timeout)
 
-	def countDownloadedPages(self):
-		return self._urlDupEliminator.size()
+	def dump(self):
+		self._urlDupEliminator.dump()
+		return self._urlDupEliminator.size() - self._backQ.qsize()
 
 
 class DupEliminator(object):
@@ -68,7 +81,6 @@ class DupEliminator(object):
 	A URLValidator is used to validate urls.
 	"""
 	def __init__(self):
-		super(DupEliminator, self).__init__()
 		self._visited = set()
 		self._lock = Lock()
 		
@@ -110,6 +122,7 @@ class DupEliminator(object):
 			os.makedirs("log")
 		output = open("log/visited.log", "w")
 		for item in self._visited:
-			output.write(item + "\n")
+			line = item.encode('utf8') + "\n"
+			output.write(line)
 			
 		

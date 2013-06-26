@@ -4,7 +4,7 @@ TO BE DONE
 
 import urllib2
 from Queue import Queue, Empty, Full
-from threading import Thread, Event
+from threading import Thread
 from datetime import datetime 
 import os
 import logging
@@ -38,7 +38,6 @@ class Downloader(Thread):
 		self._urlQ = urlQ
 		self._pageQ = pageQ
 		self._userAgent = userAgent
-		self._stopEvent = Event()
 		self._logger = logger
 
 	def log(self, level, msg):
@@ -69,8 +68,14 @@ class Downloader(Thread):
 		            page = urllib2.urlopen(request)
 		            content = page.read()
 		            page.close()
+		            filename = "log/" + url.replace("/", "")
+		            output = open(filename, "w")
+		            output.write(content)
+		            output.close()
 		            if(content):
 		            	return Page(url, content)
+		            else:
+		            	self.log(logging.WARNING, "Unable to open " + url)
 		except:
 			self.log(logging.WARNING, "Unable to open " + url)
 
@@ -78,16 +83,10 @@ class Downloader(Thread):
 		"""
 		Start downloading.
 		"""
-		# index = 0
-		while(not self._stopEvent.is_set()):
+		while(True):
 			try:
 				url = self._urlQ.get(timeout = 2)
 				page = self.download(url)
-				# index += 1
-				# page = page if page else ""
-				# temp.write(page)
-				# temp.close()
-				# print page
 				if page and (not self._pageQ.full()):
 					self._pageQ.put(page, timeout = 2)
 			
@@ -95,12 +94,3 @@ class Downloader(Thread):
 				self.log(logging.WARNING, "urlQ is empty") 
 			except Full:
 				self.log(logging.WARNING, "pageQ is full") 
-
-		# self.log(logging.INFO, str(index) + " pages downloaded")
-				
-	def stop(self):
-		"""
-		Stop downloading.
-		"""
-		self._stopEvent.set()
-		

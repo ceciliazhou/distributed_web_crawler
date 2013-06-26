@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 from Queue import Queue, Empty, Full
-from threading import Thread, Event
+from threading import Thread
 from datetime import datetime 
 from urlparse import urljoin
 
@@ -28,7 +28,7 @@ class Parser(Thread):
 		super(Parser, self).__init__()
 		self._pageQ = pageQ
 		self._urlQ = urlQ
-		self._stopEvent = Event()
+		# self._stopEvent = Event()
 		self._logger = logger
 
 	def log(self, level, msg):
@@ -58,11 +58,6 @@ class Parser(Thread):
 			for link in parser.findAll('a'):
 				if link.has_attr('href'):
 					url = link['href']
-					# if url.startswith('/'):
-					# 	url = site + url
-					# TO BE DONE
-					# if url.startswith("http"):
-						# links.append(url)
 					url = urljoin(page.getURL(), url)
 					links.append(url)
 		except:
@@ -73,7 +68,8 @@ class Parser(Thread):
 		"""
 		Start parsing.
 		"""
-		while(not self._stopEvent.is_set()):
+		# while(not self._stopEvent.is_set()):
+		while(True):
 			try:
 				page = self._pageQ.get(timeout = 5)
 				for link in self.parse(page):
@@ -82,11 +78,10 @@ class Parser(Thread):
 				self.log(logging.WARNING, "pageQ is empty") 
 			except Full:
 				self.log(logging.WARNING, "urlQ is full") 
-
 				
-	def stop(self):
-		"""
-		Stop parsing.
-		"""
-		self._stopEvent.set()
+	# def stop(self):
+	# 	"""
+	# 	Stop parsing.
+	# 	"""
+	# 	self._stopEvent.set()
 		

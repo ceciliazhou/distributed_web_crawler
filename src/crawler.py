@@ -1,3 +1,4 @@
+import sys
 from optparse import OptionParser
 from engine import Engine
 
@@ -8,9 +9,9 @@ def parseCommandLineArgs():
 	parser.add_option("-s", "--seeds", dest="seeds", default=DEFAULT_SEEDS,
 	                  help="the web sites from which to start crawling")
 	parser.add_option("-d", "--download", dest="downloaders", default=4,
-	                  help="number of threads which download web pages")
-	parser.add_option("-p", "--parser", dest="parsers", default=2,
-	                  help="number of threads which parse web pages to extract links")
+	                  help="number of threads which download web pages. ")
+	parser.add_option("-p", "--parser", dest="parsers", default=1,
+	                  help="number of threads which parse web pages to extract links. (recommend: d/10???")
 	(options, args) = parser.parse_args()
 	seeds = options.seeds
 	seeds = seeds.split()

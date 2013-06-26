@@ -7,12 +7,14 @@ from downloader import Downloader
 from parser import Parser
 from frontier import Frontier
 
+MAX_URL_QSIZE = 10000
+MAX_PAGE_QSIZE = 100
+
 class Engine(object):
 	"""
 	A Engine starts working by starting a number of downloader threads and a number of parser threads. 
 	It keeps crawling internet from a given set of seeds until being stopped.
 	"""
-	
 	def __init__(self, seeds, nDownloader, nParser):
 		"""
 		Initialize a crawler object.
@@ -27,9 +29,8 @@ class Engine(object):
 		---------  Return --------
 		None.
 		"""
-		super(Engine, self).__init__()
-		self._urlQ = Frontier()
-		self._pageQ = Queue()
+		self._urlQ = Frontier(MAX_URL_QSIZE)
+		self._pageQ = Queue(MAX_PAGE_QSIZE)
 		for seed in seeds:
 			self._urlQ.put(seed)
 		
@@ -44,18 +45,20 @@ class Engine(object):
 				
 		self._downloaders = []
 		for i in range(nDownloader):
-			self._downloaders.append(Downloader(self._urlQ, self._pageQ, downloadLogger))
+			downloader = Downloader(self._urlQ, self._pageQ, downloadLogger)
+			downloader.daemon = True
+			self._downloaders.append(downloader)
 		self._parsers = []
 		for i in range(nParser):
-			self._parsers.append(Parser(self._pageQ, self._urlQ, parseLogger))
-
+			parser = Parser(self._pageQ, self._urlQ, parseLogger)
+			parser.daemon = True
+			self._parsers.append(parser)
 
 	def start(self):
 		"""
 		Start crawling.
 		"""
 		print "[%s] : Crawler is started!" % datetime.now()
-		self._urlQ.start()
 		for downloader in self._downloaders:
 			downloader.start()
 		for parser in self._parsers:
@@ -65,12 +68,7 @@ class Engine(object):
 		"""
 		Stop crawling.
 		"""
-		self._urlQ.stop()
-		for downloader in self._downloaders:
-			downloader.stop()
-		for parser in self._parsers:
-			parser.stop()
 		print "[%s] : Crawler is stopped!" %datetime.now()
-		print self._urlQ.countDownloadedPages(), " pages downloaded!"
+		print self._urlQ.dump(), " pages downloaded!"
 
 
