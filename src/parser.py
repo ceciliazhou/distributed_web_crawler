@@ -28,7 +28,6 @@ class Parser(Thread):
 		super(Parser, self).__init__()
 		self._pageQ = pageQ
 		self._urlQ = urlQ
-		# self._stopEvent = Event()
 		self._logger = logger
 
 	def log(self, level, msg):
@@ -68,7 +67,6 @@ class Parser(Thread):
 		"""
 		Start parsing.
 		"""
-		# while(not self._stopEvent.is_set()):
 		while(True):
 			try:
 				page = self._pageQ.get(timeout = 5)
@@ -79,9 +77,4 @@ class Parser(Thread):
 			except Full:
 				self.log(logging.WARNING, "urlQ is full") 
 				
-	# def stop(self):
-	# 	"""
-	# 	Stop parsing.
-	# 	"""
-	# 	self._stopEvent.set()
-		
+	

@@ -12,7 +12,7 @@ import logging
 from page import Page
 
 class Downloader(Thread):
-	DEFAULT_USER_AGENT = "User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:21.0) Gecko/20100101 Firefox/21.0"
+	DEFAULT_USER_AGENT = "User-Agent: Mozilla/5.0"
 
 	"""
 	A Downloader is a thread that keeps downloading web pages until it's stopped.
@@ -68,10 +68,10 @@ class Downloader(Thread):
 		            page = urllib2.urlopen(request)
 		            content = page.read()
 		            page.close()
-		            filename = "log/" + url.replace("/", "")
-		            output = open(filename, "w")
-		            output.write(content)
-		            output.close()
+		            # filename = "log/" + url.replace("/", "") ##for testing
+		            # output = open(filename, "w")
+		            # output.write(content)
+		            # output.close()
 		            if(content):
 		            	return Page(url, content)
 		            else:

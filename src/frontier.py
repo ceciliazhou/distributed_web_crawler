@@ -1,7 +1,7 @@
 from Queue import Queue, Empty, Full
 from threading import Thread, Lock
-import time
-
+from datetime import datetime
+import logging
 
 class Frontier(object):
 	"""
@@ -22,7 +22,7 @@ class Frontier(object):
 		self._backQ = Queue(maxQSize)
 		self._eliminators = []
 		self._urlDupEliminator = DupEliminator()
-		self._lock = Lock()
+		self._lock = Lock() #prevent from concurrent access to _housecleanThread
 		self._housecleanThread = None
 
 	def register(self, eliminateFunc):
@@ -53,7 +53,7 @@ class Frontier(object):
 				if not self.__elim(url):
 					self._backQ.put(url, timeout = 2)	
 		except:
-			print "url front Q is empty or back Q is full. should stop the housecleaning thread for a while"
+			logging.getLogger().info("url front Q is empty or back Q is full. Will stop the housecleaning thread for a while")
 		finally:
 			self._housecleanThread = None
 
@@ -113,7 +113,7 @@ class DupEliminator(object):
 		finally:
 			self._lock.release()
 
-	def dump(self):
+	def dump(self): #just for testing, will be removed eventually
 		"""
 		Dump the visited urls into ./log/visited.log
 		"""
@@ -121,8 +121,9 @@ class DupEliminator(object):
 		if(not os.path.exists("log")):
 			os.makedirs("log")
 		output = open("log/visited.log", "w")
+		self._lock.acquire()
 		for item in self._visited:
-			line = item.encode('utf8') + "\n"
+			line = "%s : %s\n" %(datetime.now(), item.encode('utf8'))
 			output.write(line)
-			
+		self._lock.release()
 		

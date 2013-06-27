@@ -6,6 +6,7 @@ from Queue import Queue
 from downloader import Downloader
 from parser import Parser
 from frontier import Frontier
+import urlFilter 
 
 MAX_URL_QSIZE = 10000
 MAX_PAGE_QSIZE = 100
@@ -29,11 +30,19 @@ class Engine(object):
 		---------  Return --------
 		None.
 		"""
-		self._urlQ = Frontier(MAX_URL_QSIZE)
+		## prepare the url frontier and page queue
 		self._pageQ = Queue(MAX_PAGE_QSIZE)
+		self._urlQ = Frontier(MAX_URL_QSIZE)
+
+		## prepare filters
+		robotFilter = urlFilter.RobotFilter(Downloader.DEFAULT_USER_AGENT)
+		filetypeFilter = urlFilter.FileTypeFilter(True, ['text/html'])
+		self._urlQ.register(robotFilter.disallow)
+		self._urlQ.register(filetypeFilter.disallow)
 		for seed in seeds:
 			self._urlQ.put(seed)
 		
+		## prepare log files
 		if(not os.path.exists("log")):
 			os.makedirs("log")
 		downloadLogger = logging.getLogger("downloader")
@@ -43,6 +52,7 @@ class Engine(object):
 		parseLogger.addHandler(logging.FileHandler(os.path.abspath("log/parser.log")))
 		parseLogger.setLevel(logging.INFO)
 				
+		## create threads for downloading and parsing tasks
 		self._downloaders = []
 		for i in range(nDownloader):
 			downloader = Downloader(self._urlQ, self._pageQ, downloadLogger)
