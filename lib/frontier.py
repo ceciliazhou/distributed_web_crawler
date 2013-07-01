@@ -135,7 +135,7 @@ class Frontier(object):
 		self._extractPriorityFunc = extractPriorityFunc
 		self._map = {}
 
-	def register(self, filterFunc):
+	def addFilter(self, filterFunc):
 		"""
 		Register a filter function. 
 		A filter function must take in an item and returns a bool to indicate whether the item should be eliminated.
