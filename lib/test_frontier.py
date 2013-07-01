@@ -24,6 +24,33 @@ class FrontierTests(unittest.TestCase):
             'http://python.org/',
             ])
 
+    def test_puts_with_one_filter(self):
+        f = Frontier(6)
+        f.addFilter(lambda url: 'd' in url)
+
+        f.put('http://google.com/')
+        f.put('http://dropbox.com/')
+        f.put('http://python.org/')
+
+        self.assertEqual(list_queue(f._frontQ), [
+            'http://google.com/',
+            'http://python.org/',
+            ])
+
+    def test_puts_with_three_filters(self):
+        f = Frontier(6)
+        f.addFilter(lambda url: 'd' in url)
+        f.addFilter(lambda url: 'x' in url)
+        f.addFilter(lambda url: 'e' in url)
+
+        f.put('http://google.com/')
+        f.put('http://dropbox.com/')
+        f.put('http://python.org/')
+
+        self.assertEqual(list_queue(f._frontQ), [
+            'http://python.org/',
+            ])
+
 
 def list_queue(q):
     """Empty the `queue`, returning its contents as a list."""
