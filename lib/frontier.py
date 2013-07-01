@@ -63,9 +63,8 @@ class Frontier(object):
                                     
 
 	Data members:
-	_frontQ: list[ Queue ]
-		a list of queues containing whatever is put in the frontier.
-		Each queue has a priority range. 
+	_frontQ: Queue
+		a queue containing whatever is put in the frontier.
 
 	_backQ: list[ Queue ]
 		a list of queues containing items to be extracted from the frontier.
@@ -102,22 +101,15 @@ class Frontier(object):
 
 
 	"""
-	class HeapNode(object):
-		"""
-		TO BE DONE
-		"""
-		def __init__(self, priority, value):
-			self._priority = priority
-			self._value = value
-
-		def __lt__(self, other):
-			return self._priority < other._priority
-
-		def __eq__(selt, other):
-			return self._priority == other._priority 
-
 	DEFAULT_MAX_SIZE = 1000
-	def __init__(self, numOfQ, maxQSize = DEFAULT_MAX_SIZE, extractPriorityFunc = None, keyFunc = hash):
+
+	def _defaultPriorityFunc(item):
+		"""
+		Default function used to determine the priority of an item. 
+		"""
+		return 0
+
+	def __init__(self, numOfQ, maxQSize = DEFAULT_MAX_SIZE, extractPriorityFunc = _defaultPriorityFunc, keyFunc = hash):
 		"""
 		Initialize the frontier.
 		"""
@@ -135,6 +127,7 @@ class Frontier(object):
 		self._extractPriorityFunc = extractPriorityFunc
 		self._map = {}
 
+
 	def addFilter(self, filterFunc):
 		"""
 		Register a filter function. 
@@ -144,27 +137,30 @@ class Frontier(object):
 
 	def get(self):
 		"""
-		How fetcher interacts with back queue:
-		Repeat: 
-			(i) extract current root q of the heap (q is a back queue)
-			(ii) fetch URL u at head of q ...
-		until we empty the q we get. (i.e.: u was the last URL in q)
-		
-		When we have emptied a back queue q, Repeat:
-			(i) pull URLs u from front queues and 
-			(ii) add u to its corresponding back queue ...
-		until we get a u whose host does not have a back queue.
-		Then put u in q and create heap entry for it.
+		Return an item whose key is of the highest priority.
 		"""
+		# How fetcher interacts with back queue:
+		# Repeat: 
+		# 	(i) extract current root q of the heap (q is a back queue)
+		# 	(ii) fetch URL u at head of q ...
+		# until we empty the q we get. (i.e.: u was the last URL in q)
+		
+		# When we have emptied a back queue q, Repeat:
+		# 	(i) pull URLs u from front queues and 
+		# 	(ii) add u to its corresponding back queue ...
+		# until we get a u whose host does not have a back queue.
+		# Then put u in q and create heap entry for it.
+
 		## TO BE DONE : accquire lock
 		if(len(self._map) == 0):
 			self._transfer()
 
-		if(self._priorityQ.empty()):
+		if(self._backQselector.empty()):
 			for(p, k) in self._map.iteritems():
-				self._priorityQ.put(HeapNode(p, k))
+				self._backQselector.put(HeapNode(p, k))
 
-		que = self._priorityQ.get() 
+		## TO BE DONE: raise an error if no item left available?
+		que = self._backQselector.get() 
 		item = que.get()
 		if(que.empty()):
 			self._map.pop(self._keyFunc(item))
@@ -177,7 +173,7 @@ class Frontier(object):
 		"""
 		for filterFunc in self._filter:
 			if(filterFunc(item)):
-				return 
+				return
 		self._frontQ.put(item)
 
 	def _findEmptyBackQ(self):
@@ -192,19 +188,36 @@ class Frontier(object):
 		"""
 		## TO BE DONE: acquire lock
 		while(not self._frontQ.empty()):
-			item = self_frontQ.get()
+			item = self._frontQ.get()
 			key = self._keyFunc(item)
 			if(not self._map.has_key(key)):
 				qID = self._findEmptyBackQ()	
 				if(qID == len(self._backQ)):
-					self._frontQ.put(item) ## maybe use a deque instead of Queue ???
+					self._frontQ.put(item) 
 					return
 				self._map[key] = qID
-				self._priorityQ.put(HeapNode(self._priorityFunc(key), key))
+				self._backQselector.put(HeapNode(self._extractPriorityFunc(key), key))
 
 			que = self._backQ[self._map[key]]
 			que.put(item)
 
+
+class HeapNode(object):
+	"""
+	TO BE DONE
+	"""
+	def __init__(self, priority, value):
+		self._priority = priority
+		self._value = value
+
+	def __lt__(self, other):
+		return self._priority < other._priority
+
+	def __eq__(selt, other):
+		return self._priority == other._priority 
+
+	def __str__(self):
+		return "Priority = %d, %s" % (self._priority, self._value)
 
 
 		
