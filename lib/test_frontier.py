@@ -63,7 +63,6 @@ class FrontierTests(unittest.TestCase):
         self.assertEqual(list_queue(f._backQ[1]), ['http://dropbox.com/'])
         self.assertEqual(list_queue(f._backQ[2]), ['http://python.org/'])
         self.assertEqual(list_queue(f._frontQ), [])
-        self.assertEqual(list_queue(f._backQselector), ['Priority = 0, google.com', 'Priority = 0, dropbox.com', 'Priority = 0, python.org'])
 
     def test_transfer_with_insufficient_backQs(self):
         f = Frontier(2, keyFunc = hostname)
@@ -76,8 +75,43 @@ class FrontierTests(unittest.TestCase):
         self.assertEqual(list_queue(f._backQ[0]), ['http://google.com/', 'http://google.com/index.html'])
         self.assertEqual(list_queue(f._backQ[1]), ['http://dropbox.com/'])
         self.assertEqual(list_queue(f._frontQ), ['http://python.org/'])
-        self.assertEqual(list_queue(f._backQselector), ['Priority = 0, google.com', 'Priority = 0, dropbox.com'])
 
+    def test_get_with_no_filter(self):
+        f = Frontier(2, keyFunc = hostname)
+        f.put('http://dropbox.com/')
+        f.put('http://google.com/')
+        f.put('http://google.com/index.html')
+        f.put('http://python.org/')
+
+        self.assertEqual(f.get(), 'http://dropbox.com/')
+        self.assertEqual(f.get(), 'http://google.com/')
+        self.assertEqual(f.get(), 'http://python.org/')
+        self.assertEqual(f.get(), 'http://google.com/index.html')
+        self.assertEqual(list_queue(f._frontQ), [])
+        
+    def test_get_with_filter(self):
+        f = Frontier(6, keyFunc = lambda x : x/10)
+        f.addFilter(lambda x : x%10 == 0)
+
+        for i in range(50):
+            f.put(i)
+
+        for j in range(1, 10):
+                for i in range(5):
+                    self.assertEqual(f.get(), i*10+j)
+        self.assertEqual(list_queue(f._frontQ), [])
+
+    def test_get_with_filter_but_insufficient_backQs(self):
+        f = Frontier(6, keyFunc = lambda x : x%10)
+        f.addFilter(lambda x : x/10 == 3)
+
+        for i in range(50):
+            f.put(i)
+
+        for i in range(50):
+            if i/10 != 3:
+                    self.assertEqual(f.get(), i)
+        self.assertEqual(list_queue(f._frontQ), [])
 
 def hostname(url):
         req= urllib2.Request(url)

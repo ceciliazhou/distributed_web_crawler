@@ -1,23 +1,21 @@
 from Queue import Queue, PriorityQueue, Empty, Full
 # from threading import Thread, Lock
 # from datetime import datetime
-# import logging
+from time import time
 
-
+DEFAULT_MAX_SIZE = 1000
+DEFAULT_TIME_OUT = 2
+	
 class Frontier(object):
 	"""
 	Frontier comes with essentially the same funtionality a regular queue can provide but with much more flexibility by customize it 
 	with different filters and priority functions. Filters are used to eliminate the unwanted items, while priority functions help determine
-	to how much extent an item should be considered more important to be dealt with (i.e. to be extracted from the frontier). 
+	to how much extent an item should be considered more important to be extracted from the frontier). 
 
 	Infrastructure:
 								-------- input
 								|
 								v
-						------------------------------------
-						|prioritizers(NOT IMPLEMENTED)|
-						------------------------------------
-								|
 						---------------------------------
 						|	filterers		|
 						---------------------------------
@@ -55,7 +53,7 @@ class Frontier(object):
 						|		||			|
 						|		v 			|
 						|    	-------------------------	|
-						|	|	maxHeap	|	|		
+						|	|	minHeap	|	|		
 						|	|   priority(key(item))	|	|
 						|	-------------------------	|
 						-----------------------------------------
@@ -63,18 +61,11 @@ class Frontier(object):
                                     
 
 	Data members:
-	_frontQ: Queue
+	_frontQ: PeekableQ
 		a queue containing whatever is put in the frontier.
 
 	_backQ: list[ Queue ]
 		a list of queues containing items to be extracted from the frontier.
-
-	_prioritizer: list[ ( func(item), weight ) ]
-		a list containing functions which produce importance of a given item. 
-		Each function comes with a weight about how much the produced importance would be seriously considered.
-		The final priority would be the sum of all the weighted importance. i.e. P(item) = sum(weight * func(item)) 
-		The resulted priority determines to which front queue the item goes.
-		DEFAUL: empyt list. That is saying all items will be of equal priority, thus, the there will be only one queue in _frontQ.
 
 	_filter: list[ func(item) ]
 		a list containing functions which tell whether a given item should be disgarded.
@@ -95,32 +86,26 @@ class Frontier(object):
 
 	_extractPriorityFunc: func(key(item))
 		a function which returns the priority indicating how much an item should be extracted from the queue 
-		whose number is determined by key(item). 
+		whose number is determined by key(item). The smaller returned value means the higher priority.
 		Every time get() is called on the frontier, an item is always extracted from the queue of the highest priority, 
-		i.e. _backQ[ { key(item) | Max(_extractPriorityFunc(key(item))) } ] ???? NOT sure how to express it accurately.
-
-
+		i.e. _backQ[ { key(item) | Min(_extractPriorityFunc(key(item))) } ] ???? NOT sure how to express it accurately.
 	"""
-	DEFAULT_MAX_SIZE = 1000
 
 	def _defaultPriorityFunc(item):
 		"""
 		Default function used to determine the priority of an item. 
 		"""
-		return 0
+		return time()
 
 	def __init__(self, numOfQ, maxQSize = DEFAULT_MAX_SIZE, extractPriorityFunc = _defaultPriorityFunc, keyFunc = hash):
 		"""
 		Initialize the frontier.
 		"""
-		self._numOfQ = numOfQ
-		self._maxQsize = maxQSize
-		self._frontQ = Queue(self._maxQsize)
+		self._frontQ = PeekableQ(maxQSize)
 		self._backQ = []
-		for i in range(self._numOfQ):
-			self._backQ.append(Queue(self._maxQsize))
+		for i in range(numOfQ):
+			self._backQ.append(Queue(maxQSize))
 
-		self._prioritizer = []
 		self._filter = []
 		self._keyFunc = keyFunc
 		self._backQselector = PriorityQueue()
@@ -157,10 +142,10 @@ class Frontier(object):
 
 		if(self._backQselector.empty()):
 			for(p, k) in self._map.iteritems():
-				self._backQselector.put(HeapNode(p, k))
+				self._backQselector.put(HeapNode(self._extractPriorityFunc(p), p))
 
-		## TO BE DONE: raise an error if no item left available?
-		que = self._backQselector.get() 
+		key = self._backQselector.get().getValue() ## may raise Empty 
+		que = self._backQ[self._map[key]]  
 		item = que.get()
 		if(que.empty()):
 			self._map.pop(self._keyFunc(item))
@@ -176,7 +161,7 @@ class Frontier(object):
 				return
 		self._frontQ.put(item)
 
-	def _findEmptyBackQ(self):
+	def _firstEmptyBackQ(self):
 		for i in range(len(self._backQ)):
 			if(self._backQ[i].empty()):
 				return i
@@ -188,27 +173,30 @@ class Frontier(object):
 		"""
 		## TO BE DONE: acquire lock
 		while(not self._frontQ.empty()):
-			item = self._frontQ.get()
+			item = self._frontQ.peek()
 			key = self._keyFunc(item)
 			if(not self._map.has_key(key)):
-				qID = self._findEmptyBackQ()	
+				qID = self._firstEmptyBackQ()	
 				if(qID == len(self._backQ)):
-					self._frontQ.put(item) 
 					return
 				self._map[key] = qID
 				self._backQselector.put(HeapNode(self._extractPriorityFunc(key), key))
 
 			que = self._backQ[self._map[key]]
-			que.put(item)
+			que.put(self._frontQ.get())
 
 
 class HeapNode(object):
 	"""
-	TO BE DONE
+	HeapNode is a simple data structure which can be used in a priority queue. 
+	It has a priorty and an associated value. The priority is the key which will be used for sorting.
 	"""
 	def __init__(self, priority, value):
 		self._priority = priority
 		self._value = value
+
+	def getValue(self):
+		return self._value
 
 	def __lt__(self, other):
 		return self._priority < other._priority
@@ -219,6 +207,54 @@ class HeapNode(object):
 	def __str__(self):
 		return "Priority = %d, %s" % (self._priority, self._value)
 
+class PeekableQ(object):
+	"""
+	PeekableQ is a FIFO queue. 
+	In addition to the methods availiable in Queue.Queue, it also provides a peek() method which returns the head item in the queue 
+	without popping it out.
+	"""
+	def __init__(self, maxSize = DEFAULT_MAX_SIZE):
+		self._Q = Queue(maxSize)
+		self._front = None
+		self._capacity = maxSize
 
+	def get(self, block = False, timeout = DEFAULT_TIME_OUT):
+		"""
+		Pop and return the item at the front of the queue.
+		"""
+		if(self._front is not None):
+			ret = self._front
+			self._front = None
+			return ret
+		else:
+			return self._Q.get(block, timeout) 
+
+	def peek(self):
+		"""
+		Return the item at the front of the queue.
+		"""
+		if(self._front is None and not self._Q.empty()):
+			self._front = self._Q.get()
+		return self._front
 		
+	def put(self, item, block = False, timeout = DEFAULT_TIME_OUT):
+		"""
+		Push an item into the queue from the back.
+		"""
+		self._Q.put(item, block, timeout)
+
+	def empty(self):
+		"""
+		Return True if the queue is empty, False otherwise.
+		"""
+		return self._Q.empty() and self._front is None
+
+	def full(self):
+		"""
+		Return True if the queue is full, False otherwise.
+		"""
+		size = self._Q.qsize()
+		if(self._front is not None):
+			size += 1
+		return size >= self._capacity
 		
