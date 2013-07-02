@@ -2,6 +2,9 @@ import os
 import logging
 from datetime import datetime
 from Queue import Queue
+import urllib2
+from threading import RLock
+import hashlib
 
 from downloader import Downloader
 from parser import Parser
@@ -32,7 +35,11 @@ class Engine(object):
 		"""
 		## prepare the url frontier and page queue
 		self._pageQ = Queue(MAX_PAGE_QSIZE)
-		self._urlQ = Frontier(10, MAX_URL_QSIZE)
+		self._urlQ = Frontier(3*nDownloader, MAX_URL_QSIZE, \
+					keyFunc=lambda url: urllib2.Request(url).get_host(), \
+					priorityFunc=self.getLastVisitTime)
+		self._visitTime = {}
+		self._lock = RLock()
 
 		## prepare filters
 		filetypeFilter = urlFilter.FileTypeFilter(True, ['text/html'])
@@ -57,7 +64,7 @@ class Engine(object):
 		## create threads for downloading and parsing tasks
 		self._downloaders = []
 		for i in range(nDownloader):
-			downloader = Downloader(self._urlQ, self._pageQ, downloadLogger)
+			downloader = Downloader(self._urlQ, self._pageQ, downloadLogger, self.updateLastVisitTime)
 			downloader.daemon = True
 			self._downloaders.append(downloader)
 		self._parsers = []
@@ -81,9 +88,29 @@ class Engine(object):
 		Stop crawling.
 		"""
 		print "[%s] : Crawler is stopped!" %datetime.now()
-		self._urlDupEliminator.dump()
 		num = self._urlDupEliminator.size() - self._urlQ.size()
 		print num, " pages downloaded!"
+		print self._urlQ.dump()
 		
+	def getLastVisitTime(self, site):
+		"""
+		Return the last time a site was visited. 
+		"""
+		self._lock.acquire()
+		lastVT = 0 
+		site = hashlib.sha1(site).hexdigest()
+		if(self._visitTime.has_key(site)):
+			lastVT = self._visitTime(site)
+		self._lock.release()
+		return lastVT
 
-
+	def updateLastVisitTime(self, site):
+		"""
+		Return the last time a site was visited. 
+		"""
+		self._lock.acquire()
+		lastVT = 0 
+		site = hashlib.sha1(site).hexdigest()
+		self._visitTime[site] = time.time()
+		self._lock.release()
+		return lastVT

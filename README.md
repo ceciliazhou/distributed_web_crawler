@@ -8,9 +8,9 @@ This is a simple web crawler. It downloads and parses web pages starting with a 
 	  -h, --help
 		show this help message and exit
 
-	  -s SEEDS, --seeds=SEEDS
-		the web sites from which to start crawling
-
+  	  -f FILE, --file=FILE  
+  	  	the file which contains the web sites from which to start crawling
+ 
 	  -d DOWNLOADERS, --download=DOWNLOADERS
 		number of threads which download web pages
 
@@ -35,8 +35,7 @@ This is a simple web crawler. It downloads and parses web pages starting with a 
 	
 	Frontier
 		Frontier maintains urls in two queues: frontQ (input) and backQ (output)
-		1. url is accepted and pushed into frontQ directly, when put() is called.
-		2. A housecleaning thread keeps moving url out from frontQ. 
-		If the url is considered disallowed by any of the registered eliminators or the duplicate eliminator, it will be discard. Otherwise, it will be pushed into backQ.
-		3. url is popped out from backQ, when get() is called.
-	
+		1. url is accepted (by put()) and pushed into frontQ if only the url survives the registered filter routines, includeing duplicate eliminator.
+		2. url is grouped by host in backQ. That is, each queue in backQ corresponds to one site. 
+		3. url is always extracted (by get()) from the group which has the highest priority. This is. important because we can configure as the priority the last time we visited the site corresponding to the group/queue, so that we always exact a url of the site hasn't been visited for the longest time.
+		4. The Frontier is designed for general purpose, not specific for the crawler. For more details, please check out core.frontier.

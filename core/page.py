@@ -36,8 +36,7 @@ class Page(object):
 	# 	return self._path
 		
 	# def __hash__(self):
-	# 	m = hashlib.md5()
-	# 	m.update(self._url)
+	# 	m = hashlib.md5(self._url)
 	# 	return m.hexdigest()
 
 	# def __eq__(self, other):

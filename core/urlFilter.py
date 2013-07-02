@@ -2,6 +2,7 @@ from robotparser import RobotFileParser
 from urlparse import urljoin
 import mimetypes
 import urllib2
+import hashlib
 from threading import Lock
 from datetime import datetime
 
@@ -21,8 +22,14 @@ class RobotFilter(object):
 		robotFile = urljoin(url, "/robots.txt")
 		if(not self._dict.has_key(robotFile)):
 			self._dict[robotFile] = RobotFileParser(robotFile)
-			self._dict[robotFile].read()
-		return not self._dict[robotFile].can_fetch(self._userAgent, url)
+			try:
+				self._dict[robotFile].read()
+			except :
+				self._dict[robotFile] = None
+		try:
+			return self._dict[robotFile] is not None and not self._dict[robotFile].can_fetch(self._userAgent, url)
+		except:
+			return True
 	
 class FileTypeFilter(object):
  	"""
@@ -39,8 +46,10 @@ class FileTypeFilter(object):
 		fileType = mimetypes.guess_type(url)[0]
 		if(self._allow == (fileType in self._filterList)):
 			return False
-		return  urllib2.Request(url).get_selector() != ""
-	
+		try:
+			return not url.endswith(urllib2.Request(url).get_host()) and not url.endswith(urllib2.Request(url).get_host()+'/')
+		except:
+			return True
 
 class DupEliminator(object):
 	"""
@@ -61,6 +70,7 @@ class DupEliminator(object):
 		"""
 		self._lock.acquire()
 		try:	
+			url = hashlib.sha1(url).hexdigest()
 			visited = url in self._visited
 			if(not visited):
 				self._visited.add(url)
@@ -79,17 +89,17 @@ class DupEliminator(object):
 		finally:
 			self._lock.release()
 
-	def dump(self): #just for testing, will be removed eventually
-		"""
-		Dump the visited urls into ./log/visited.log
-		"""
-		import os
-		if(not os.path.exists("log")):
-			os.makedirs("log")
-		output = open("log/visited.log", "w")
-		self._lock.acquire()
-		for item in self._visited:
-			line = "%s : %s\n" %(datetime.now(), item.encode('utf8'))
-			output.write(line)
-		self._lock.release()
-		
+	# def dump(self): #just for testing, will be removed eventually
+	# 	"""
+	# 	Dump the visited urls into ./log/visited.log
+	# 	"""
+	# 	import os
+	# 	if(not os.path.exists("log")):
+	# 		os.makedirs("log")
+	# 	output = open("log/visited.log", "w")
+	# 	self._lock.acquire()
+	# 	for item in self._visited:
+	# 		line = item.encode('utf8') + "\n"
+	# 		output.write(line)
+	# 	self._lock.release()
+	# 	

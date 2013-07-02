@@ -18,7 +18,7 @@ class Downloader(Thread):
 	A Downloader is a thread that keeps downloading web pages until it's stopped.
 	"""
 
-	def __init__(self, urlQ, pageQ, logger = None, userAgent = DEFAULT_USER_AGENT):
+	def __init__(self, urlQ, pageQ, logger = None, userAgent = DEFAULT_USER_AGENT, callbackFun = None):
 		"""
 		Initialize a Downloader.
 		---------  Param --------
@@ -39,6 +39,7 @@ class Downloader(Thread):
 		self._pageQ = pageQ
 		self._userAgent = userAgent
 		self._logger = logger
+		self._callbackFun = callbackFun
 
 	def log(self, level, msg):
 		"""
@@ -63,22 +64,21 @@ class Downloader(Thread):
 			(str) The html contents of the web page.
 		"""
 		try:
-			self._logger.info("[%s] downloading file: %s" % (datetime.now(), url))
+			self.log(logging.INFO, "downloading file: "+url)
 			request = urllib2.Request(url)
 			request.add_header('User-Agent', self._userAgent)
 			page = urllib2.urlopen(request)
+			if(self._callbackFun is not None):
+				self._callbackFun(request.get_host())
 			content = page.read()
 			page.close()
-		            # filename = "log/" + url.replace("/", "") ##for testing
-		            # output = open(filename, "w")
-		            # output.write(content)
-		            # output.close()
 			if(content):
 				return Page(url, content)
-			else:
-				self.log(logging.WARNING, "Unable to open " + url)
+			# else:
+			# 	self.log(logging.WARNING, "Unable to open " + url)
 		except:
 			self.log(logging.WARNING, "Unable to open " + url)
+
 
 	def run(self):
 		"""
@@ -87,9 +87,10 @@ class Downloader(Thread):
 		while(True):
 			try:
 				url = self._urlQ.get(timeout = 2)
-				page = self.download(url)
-				if page and (not self._pageQ.full()):
-					self._pageQ.put(page, timeout = 2)
+				if url is not None:
+					page = self.download(url)
+					if page and (not self._pageQ.full()):
+						self._pageQ.put(page, timeout = 2)
 			
 			except Empty:
 				self.log(logging.WARNING, "urlQ is empty") 

@@ -4,6 +4,8 @@ import unittest
 from frontier import Frontier
 from Queue import Empty
 import urllib2 
+from threading import Thread
+import time
 
 class FrontierTests(unittest.TestCase):
 
@@ -112,6 +114,43 @@ class FrontierTests(unittest.TestCase):
             if i/10 != 3:
                     self.assertEqual(f.get(), i)
         self.assertEqual(list_queue(f._frontQ), [])
+
+    def test_frontier_with_multi_thread(self):
+        f = Frontier(5, keyFunc = lambda x : x/10)
+        f.addFilter(lambda x : x%10 > 3)
+        for i in range(5):
+            Thread(target=put_numbers, args=(f, 0, 49)).start()
+
+        out = [] 
+        threads = []
+        for i in range(6):
+            out.append([])
+            t = Thread(target=get_numbers, args=(f, out[i]))
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        result = []
+        for i in range(6):
+            result += out[i]
+        result.sort()
+        for i in range(len(result)):
+            print result[i][1], 
+            if (i+1)%5 == 0:
+                print
+
+
+def put_numbers(F, min, max):
+    for i in range(min, max+1):
+        F.put(i)
+
+def get_numbers(F, out):
+    while(F.size() > 0):
+        data = F.get(block=False)
+        t = (time.time(), data)
+        out.append(t)
 
 def hostname(url):
         req= urllib2.Request(url)
