@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import sys
 from optparse import OptionParser
-from engine import Engine
+from core.engine import Engine
 
 DEFAULT_SEEDS = "http://en.wikipedia.org"
 DEFAULT_DOWNLOADERS = 4

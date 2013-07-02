@@ -5,7 +5,7 @@ from Queue import Queue
 
 from downloader import Downloader
 from parser import Parser
-from frontier import Frontier
+from lib.frontier import Frontier
 import urlFilter 
 
 MAX_URL_QSIZE = 10000
@@ -32,13 +32,15 @@ class Engine(object):
 		"""
 		## prepare the url frontier and page queue
 		self._pageQ = Queue(MAX_PAGE_QSIZE)
-		self._urlQ = Frontier(MAX_URL_QSIZE)
+		self._urlQ = Frontier(10, MAX_URL_QSIZE)
 
 		## prepare filters
-		robotFilter = urlFilter.RobotFilter(Downloader.DEFAULT_USER_AGENT)
 		filetypeFilter = urlFilter.FileTypeFilter(True, ['text/html'])
-		self._urlQ.register(robotFilter.disallow)
-		self._urlQ.register(filetypeFilter.disallow)
+		robotFilter = urlFilter.RobotFilter(Downloader.DEFAULT_USER_AGENT)
+		self._urlDupEliminator = urlFilter.DupEliminator()
+		self._urlQ.addFilter(filetypeFilter.disallow)
+		self._urlQ.addFilter(robotFilter.disallow)
+		self._urlQ.addFilter(self._urlDupEliminator.seenBefore)
 		for seed in seeds:
 			self._urlQ.put(seed)
 		
@@ -79,6 +81,9 @@ class Engine(object):
 		Stop crawling.
 		"""
 		print "[%s] : Crawler is stopped!" %datetime.now()
-		print self._urlQ.dump(), " pages downloaded!"
+		self._urlDupEliminator.dump()
+		num = self._urlDupEliminator.size() - self._urlQ.size()
+		print num, " pages downloaded!"
+		
 
 

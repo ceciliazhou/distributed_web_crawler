@@ -63,19 +63,20 @@ class Downloader(Thread):
 			(str) The html contents of the web page.
 		"""
 		try:
-		            request = urllib2.Request(url)
-		            request.add_header('User-Agent', self._userAgent)
-		            page = urllib2.urlopen(request)
-		            content = page.read()
-		            page.close()
+			self._logger.info("[%s] downloading file: %s" % (datetime.now(), url))
+			request = urllib2.Request(url)
+			request.add_header('User-Agent', self._userAgent)
+			page = urllib2.urlopen(request)
+			content = page.read()
+			page.close()
 		            # filename = "log/" + url.replace("/", "") ##for testing
 		            # output = open(filename, "w")
 		            # output.write(content)
 		            # output.close()
-		            if(content):
-		            	return Page(url, content)
-		            else:
-		            	self.log(logging.WARNING, "Unable to open " + url)
+			if(content):
+				return Page(url, content)
+			else:
+				self.log(logging.WARNING, "Unable to open " + url)
 		except:
 			self.log(logging.WARNING, "Unable to open " + url)
 

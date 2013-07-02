@@ -100,7 +100,7 @@ class FrontierTests(unittest.TestCase):
                 for i in range(5):
                     self.assertEqual(f.get(), i*10+j)
         self.assertEqual(list_queue(f._frontQ), [])
-
+            
     def test_get_with_filter_but_insufficient_backQs(self):
         f = Frontier(6, keyFunc = lambda x : x%10)
         f.addFilter(lambda x : x/10 == 3)
