@@ -13,10 +13,6 @@ This is a simple web crawler. It downloads and parses web pages starting with a 
  
 	  -d DOWNLOADERS, --download=DOWNLOADERS
 		number of threads which download web pages
-
-	  -p PARSERS, --parser=PARSERS
-		number of threads which parse web pages to extract links
-
 	
 ###Desgin:
 	

@@ -8,6 +8,7 @@ from threading import Thread
 from datetime import datetime 
 import os
 import logging
+import time
 
 from page import Page
 
@@ -57,11 +58,11 @@ class Downloader(Thread):
 		"""
 		Download a web page from url.
 		---------  Param --------
-			url: (str) 	
-				The url of the web page to be downloaded.
+		url: (str) 	
+			The url of the web page to be downloaded.
 
 		---------  Return --------
-			(str) The html contents of the web page.
+		(str) The html contents of the web page.
 		"""
 		try:
 			self.log(logging.INFO, "downloading file: "+url)
@@ -74,8 +75,6 @@ class Downloader(Thread):
 			page.close()
 			if(content):
 				return Page(url, content)
-			# else:
-			# 	self.log(logging.WARNING, "Unable to open " + url)
 		except:
 			self.log(logging.WARNING, "Unable to open " + url)
 
@@ -91,8 +90,8 @@ class Downloader(Thread):
 					page = self.download(url)
 					if page and (not self._pageQ.full()):
 						self._pageQ.put(page, timeout = 2)
-			
 			except Empty:
 				self.log(logging.WARNING, "urlQ is empty") 
+				time.sleep(5)
 			except Full:
 				self.log(logging.WARNING, "pageQ is full") 

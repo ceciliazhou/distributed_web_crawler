@@ -17,12 +17,12 @@ def parseCommandLineArgs():
 	#                   help="number of threads which parse web pages to extract links. (recommend: d/10???")
 	(options, args) = parser.parse_args()
 	fname = options.file
-	f = open(fname, "r")
+	f = open(options.file, "r")
 	seeds = []
 	for line in f.readlines():
 		seeds.append(line.strip())
 	f.close()
-	return seeds, int(options.downloaders),   DEFAULT_PARSERS
+	return seeds, int(options.downloaders),  DEFAULT_PARSERS 
 
 def main():
 	seeds, downloaders, parsers  = parseCommandLineArgs()

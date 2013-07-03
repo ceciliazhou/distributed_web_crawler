@@ -141,6 +141,23 @@ class FrontierTests(unittest.TestCase):
             if (i+1)%5 == 0:
                 print
 
+    def test_frontier_with_url_file(self):
+        f = Frontier(12, keyFunc= hostname)
+        seeds = open("input", 'r')
+        urls = []
+        for line in seeds.readlines():
+            f.put(line.strip())
+        seeds.close()
+
+        output = open("output.log", "w")
+        output.write("f.size() = "+str(f.size()) +"\n")
+        while(f.size() > 0):
+            item = f.get()
+            item = "" if item is None else item
+            line = item.encode('utf8') + "\n"
+            output.write(line)
+        output.close()
+
 
 def put_numbers(F, min, max):
     for i in range(min, max+1):
@@ -166,6 +183,7 @@ def list_queue(q):
         except Empty:
             break
     return items
+
 
 
 if __name__ == '__main__':

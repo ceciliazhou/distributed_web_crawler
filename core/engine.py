@@ -3,8 +3,9 @@ import logging
 from datetime import datetime
 from Queue import Queue
 import urllib2
-from threading import RLock
+from threading import RLock, Timer
 import hashlib
+import time
 
 from downloader import Downloader
 from parser import Parser
@@ -38,7 +39,7 @@ class Engine(object):
 		self._urlQ = Frontier(3*nDownloader, MAX_URL_QSIZE, \
 					keyFunc=lambda url: urllib2.Request(url).get_host(), \
 					priorityFunc=self.getLastVisitTime)
-		self._visitTime = {}
+		self._visitSite = {}
 		self._lock = RLock()
 
 		## prepare filters
@@ -46,7 +47,7 @@ class Engine(object):
 		robotFilter = urlFilter.RobotFilter(Downloader.DEFAULT_USER_AGENT)
 		self._urlDupEliminator = urlFilter.DupEliminator()
 		self._urlQ.addFilter(filetypeFilter.disallow)
-		self._urlQ.addFilter(robotFilter.disallow)
+		# self._urlQ.addFilter(robotFilter.disallow)
 		self._urlQ.addFilter(self._urlDupEliminator.seenBefore)
 		for seed in seeds:
 			self._urlQ.put(seed)
@@ -82,15 +83,42 @@ class Engine(object):
 			downloader.start()
 		for parser in self._parsers:
 			parser.start()
+		Timer(4, self._statistic).start()
+		Timer(8, self._statistic).start()
+		Timer(12, self._statistic).start()
 
 	def stop(self):
 		"""
 		Stop crawling.
 		"""
 		print "[%s] : Crawler is stopped!" %datetime.now()
-		num = self._urlDupEliminator.size() - self._urlQ.size()
-		print num, " pages downloaded!"
-		print self._urlQ.dump()
+		self._statistic()
+		self._dump()
+		
+	def _statistic(self):
+		"""
+		Output statistic info.
+		"""
+		total = self._urlDupEliminator.size()
+		left = self._urlQ.size()
+		print "%d url discovered, but only %d downloaded and %d ready for downloading." %(total, total-left, left)
+
+	def _dump(self):
+		"""
+		Dump the ready_to_be_crawled urls to log file.
+		"""
+		import os
+		if(not os.path.exists("log")):
+			os.makedirs("log")
+		output = open("log/readyToBeVisited.log", "w")
+		
+		while(self._urlQ.size() > 0):
+			item = self._urlQ.get()
+			self.updateLastVisitTime(urllib2.Request(item).get_host())
+			item = "" if item is None else item
+			line = item.encode('utf8') + "\n"
+			output.write(line)
+		output.close()
 		
 	def getLastVisitTime(self, site):
 		"""
@@ -98,9 +126,9 @@ class Engine(object):
 		"""
 		self._lock.acquire()
 		lastVT = 0 
-		site = hashlib.sha1(site).hexdigest()
-		if(self._visitTime.has_key(site)):
-			lastVT = self._visitTime(site)
+		# site = hashlib.sha1(site).hexdigest()
+		if(self._visitSite.has_key(site)):
+			lastVT = self._visitSite[site]
 		self._lock.release()
 		return lastVT
 
@@ -109,8 +137,6 @@ class Engine(object):
 		Return the last time a site was visited. 
 		"""
 		self._lock.acquire()
-		lastVT = 0 
-		site = hashlib.sha1(site).hexdigest()
-		self._visitTime[site] = time.time()
+		# site = hashlib.sha1(site).hexdigest()
+		self._visitSite[site] = time.time()
 		self._lock.release()
-		return lastVT

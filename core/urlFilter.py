@@ -19,17 +19,19 @@ class RobotFilter(object):
 		"""
 		TO BE DONE
 		"""
+		print url
 		robotFile = urljoin(url, "/robots.txt")
-		if(not self._dict.has_key(robotFile)):
-			self._dict[robotFile] = RobotFileParser(robotFile)
+		key = hashlib.sha1(robotFile).hexdigest()
+		if(not self._dict.has_key(key)):
+			self._dict[key] = RobotFileParser(robotFile)
 			try:
-				self._dict[robotFile].read()
+				self._dict[key].read()
 			except :
-				self._dict[robotFile] = None
-		try:
-			return self._dict[robotFile] is not None and not self._dict[robotFile].can_fetch(self._userAgent, url)
-		except:
-			return True
+				self._dict[key] = None
+		result = self._dict[key] is None or not self._dict[key].can_fetch(self._userAgent, url)
+		print result
+		return result
+		
 	
 class FileTypeFilter(object):
  	"""
@@ -70,7 +72,7 @@ class DupEliminator(object):
 		"""
 		self._lock.acquire()
 		try:	
-			url = hashlib.sha1(url).hexdigest()
+			# url = hashlib.sha1(url).hexdigest()
 			visited = url in self._visited
 			if(not visited):
 				self._visited.add(url)

@@ -2,7 +2,7 @@ from Queue import Queue, PriorityQueue, Empty, Full
 from time import time
 from threading import Thread, RLock
 
-
+DEFAULT_Q_NUM = 10
 DEFAULT_MAX_SIZE = 1000
 DEFAULT_TIME_OUT = 2
 
@@ -92,12 +92,13 @@ class Frontier(object):
 		"""
 		return time()
 
-	def __init__(self, numOfQ, maxQSize = DEFAULT_MAX_SIZE, keyFunc = hash, priorityFunc = _defaultPriorityFunc):
+	def __init__(self, numOfQ =  DEFAULT_Q_NUM, maxQSize = DEFAULT_MAX_SIZE, keyFunc = hash, priorityFunc = _defaultPriorityFunc):
 		"""
 		Initialize the frontier.
 		"""
 		self._frontQ = PeekableQ(maxQSize)
 		self._backQ = []
+		numOfQ = numOfQ if numOfQ > 0 else DEFAULT_Q_NUM
 		for i in range(numOfQ):
 			self._backQ.append(Queue(maxQSize))
 
@@ -141,7 +142,7 @@ class Frontier(object):
 
 		if(self._backQselector.empty()):
 			self._lock.release()
-			return
+			raise Empty()
 		key = self._backQselector.get(block, timeout).getValue() ## may raise Empty 
 		que = self._backQ[self._map[key]]  
 		item = que.get(block, timeout)
@@ -199,21 +200,6 @@ class Frontier(object):
 			sz += q.qsize()
 		self._lock.release()
 		return sz
-
-	def dump(self):
-		"""
-		TO BE DONE
-		"""
-		self._lock.acquire()
-		urls = []
-		while(not self._frontQ.empty()):
-			urls.append(self._frontQ.get())
-		for q in self._backQ:
-			while(not q.empty()):
-				urls.append(q.get())
-		self._lock.release()
-		return urls
-
 
 class HeapNode(object):
 	"""
