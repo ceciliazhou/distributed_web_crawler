@@ -1,8 +1,8 @@
-This is a simple web crawler. It downloads and parses web pages starting with a given set of web sites which is called seeds. 
+This is a web crawler. It downloads and parses web pages starting with a given set of web sites which is called seeds. 
 
 ###Usage:
 	
-	python crawler.py [options]
+	crawler.py [options]
 	
 	Options:
 	  -h, --help
@@ -18,11 +18,13 @@ This is a simple web crawler. It downloads and parses web pages starting with a 
 	
 	Engine
 		The main component of a crawler. The job of an engine consists of:
-		1. initializes two queues: urlQ storing urls, pageQ storing downloaded web pages.
+		1. initializes two queues: urlQ (using our own Frontier) storing urls, pageQ (using the standard Queue)
+		   storing downloaded web pages.
 		2. starts/stops the configured number of downloader threads and parser threads.
 	
 	Downloader
-		Downloader keeps fetching url from the urlQ and downloading web pages located that url only if the url hasn't been visited before.
+		Downloader keeps fetching url from the urlQ and downloading web pages located that url 
+		only if the url hasn't been visited before.
 		Everytime a pages is downloaded, it will be put into the pageQ for parsing.
 	
 	Parser
@@ -31,7 +33,12 @@ This is a simple web crawler. It downloads and parses web pages starting with a 
 	
 	Frontier
 		Frontier maintains urls in two queues: frontQ (input) and backQ (output)
-		1. url is accepted (by put()) and pushed into frontQ if only the url survives the registered filter routines, includeing duplicate eliminator.
+		1. url is accepted (by put()) and pushed into frontQ if only the url survives the registered 
+		   filter routines, includeing duplicate eliminator.
 		2. url is grouped by host in backQ. That is, each queue in backQ corresponds to one site. 
-		3. url is always extracted (by get()) from the group which has the highest priority. This is. important because we can configure as the priority the last time we visited the site corresponding to the group/queue, so that we always exact a url of the site hasn't been visited for the longest time.
-		4. The Frontier is designed for general purpose, not specific for the crawler. For more details, please check out core.frontier.
+		3. url is always extracted (by get()) from the group which has the highest priority. 
+		   This is important because we can configure as the priority the last time we visited the site 
+		   corresponding to the group/queue, so that we always exact a url of the site hasn't been visited 
+		   for the longest time.
+		4. The Frontier is designed for general purpose, not specific for the crawler. 
+		   For more details, please check out core.frontier.
