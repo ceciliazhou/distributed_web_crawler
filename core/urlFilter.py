@@ -19,7 +19,6 @@ class RobotFilter(object):
 		"""
 		TO BE DONE
 		"""
-		print url
 		robotFile = urljoin(url, "/robots.txt")
 		key = hashlib.sha1(robotFile).hexdigest()
 		if(not self._dict.has_key(key)):
@@ -29,7 +28,6 @@ class RobotFilter(object):
 			except :
 				self._dict[key] = None
 		result = self._dict[key] is None or not self._dict[key].can_fetch(self._userAgent, url)
-		print result
 		return result
 		
 	

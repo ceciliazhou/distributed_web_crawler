@@ -3,16 +3,16 @@ import sys
 from optparse import OptionParser
 from core.engine import Engine
 
-DEFAULT_SEEDS = "seeds.cfg"
+DEFAULT_SEEDS = "conf/seeds.cfg"
 DEFAULT_DOWNLOADERS = 4
 DEFAULT_PARSERS = 1
 
 def parseCommandLineArgs():
 	parser = OptionParser()
 	parser.add_option("-f", "--file", dest="file", default=DEFAULT_SEEDS,
-	                  help="the file which contains the web sites from which to start crawling")
+	                  help="the file which contains the web sites from which to start crawling, ./conf/seeds.cfg is used by default.")
 	parser.add_option("-d", "--download", dest="downloaders", default=DEFAULT_DOWNLOADERS,
-	                  help="number of threads which download web pages. ")
+	                  help="number of threads which download web pages. 4 by default.")
 	# parser.add_option("-p", "--parser", dest="parsers", default=DEFAULT_PARSERS,
 	#                   help="number of threads which parse web pages to extract links. (recommend: d/10???")
 	(options, args) = parser.parse_args()

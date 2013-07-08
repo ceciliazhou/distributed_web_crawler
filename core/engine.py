@@ -47,7 +47,7 @@ class Engine(object):
 		robotFilter = urlFilter.RobotFilter(Downloader.DEFAULT_USER_AGENT)
 		self._urlDupEliminator = urlFilter.DupEliminator()
 		self._urlQ.addFilter(filetypeFilter.disallow)
-		# self._urlQ.addFilter(robotFilter.disallow)
+		self._urlQ.addFilter(robotFilter.disallow)
 		self._urlQ.addFilter(self._urlDupEliminator.seenBefore)
 		for seed in seeds:
 			self._urlQ.put(seed)

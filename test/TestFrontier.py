@@ -1,7 +1,8 @@
+#!/usr/bin/python
 """Tests for the Frontier class."""
 
 import unittest
-from frontier import Frontier
+from lib.frontier import Frontier
 from Queue import Empty
 import urllib2 
 from threading import Thread
@@ -116,9 +117,12 @@ class FrontierTests(unittest.TestCase):
         self.assertEqual(list_queue(f._frontQ), [])
 
     def test_frontier_with_multi_thread(self):
-        f = Frontier(5, keyFunc = lambda x : x/10)
-        f.addFilter(lambda x : x%10 > 3)
-        for i in range(5):
+        keyFunc = lambda x : x/10
+        filterFunc = lambda x : x%10 > 3
+        numOfQ = 5
+        f = Frontier(numOfQ, keyFunc=keyFunc)
+        f.addFilter(filterFunc)
+        for i in range(numOfQ):
             Thread(target=put_numbers, args=(f, 0, 49)).start()
 
         out = [] 
@@ -137,19 +141,19 @@ class FrontierTests(unittest.TestCase):
             result += out[i]
         result.sort()
         for i in range(len(result)):
-            print result[i][1], 
-            if (i+1)%5 == 0:
-                print
+            # assert continous output are from different groups
+            assert(keyFunc(result[i][1]) == i%numOfQ)
 
     def test_frontier_with_url_file(self):
         f = Frontier(12, keyFunc= hostname)
-        seeds = open("input", 'r')
+        import os
+        seeds = open(os.path.realpath("test/sample_input"), 'r')
         urls = []
         for line in seeds.readlines():
             f.put(line.strip())
         seeds.close()
 
-        output = open("output.log", "w")
+        output = open("test/sample_output", "w")
         output.write("f.size() = "+str(f.size()) +"\n")
         while(f.size() > 0):
             item = f.get()
@@ -165,9 +169,13 @@ def put_numbers(F, min, max):
 
 def get_numbers(F, out):
     while(F.size() > 0):
-        data = F.get(block=False)
-        t = (time.time(), data)
-        out.append(t)
+        try:
+            data = F.get(block=False)
+            if data is not None:
+                t = (time.time(), data)
+                out.append(t)
+        except Empty:
+            pass
 
 def hostname(url):
         req= urllib2.Request(url)

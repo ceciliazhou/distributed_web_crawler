@@ -16,10 +16,10 @@ Usage:
 		show this help message and exit
 
   	  -f FILE, --file=FILE  
-  	  	the file which contains the web sites from which to start crawling
+  	  	the file which contains the web sites from which to start crawling. ./conf/seeds.cfg is used by default.
  
 	  -d DOWNLOADERS, --download=DOWNLOADERS
-		number of threads which download web pages
+		number of threads which download web pages. 4 by default.
 	
 Desgin:
 ------------	
