@@ -46,11 +46,15 @@ class Engine(object):
 		filetypeFilter = urlFilter.FileTypeFilter(True, ['text/html'])
 		robotFilter = urlFilter.RobotFilter(Downloader.DEFAULT_USER_AGENT)
 		self._urlDupEliminator = urlFilter.DupEliminator()
+		self._urlQ.addFilter(self._urlDupEliminator.seenBefore)
+		# By inserting the seeds into urlQ before setting other Filters, 
+		# we are assuming the seeds in configure file are allowed by all filters. 
+		# In this way, we can speed up the initializtion period of the program very much.
+		for seed in seeds: 
+			self._urlQ.put(seed)
+		
 		self._urlQ.addFilter(filetypeFilter.disallow)
 		self._urlQ.addFilter(robotFilter.disallow)
-		self._urlQ.addFilter(self._urlDupEliminator.seenBefore)
-		for seed in seeds:
-			self._urlQ.put(seed)
 		
 		## prepare log files
 		if(not os.path.exists("log")):
@@ -83,9 +87,6 @@ class Engine(object):
 			downloader.start()
 		for parser in self._parsers:
 			parser.start()
-		Timer(4, self._statistic).start()
-		Timer(8, self._statistic).start()
-		Timer(12, self._statistic).start()
 
 	def stop(self):
 		"""
@@ -126,7 +127,7 @@ class Engine(object):
 		"""
 		self._lock.acquire()
 		lastVT = 0 
-		# site = hashlib.sha1(site).hexdigest()
+		site = hashlib.sha1(site).hexdigest()
 		if(self._visitSite.has_key(site)):
 			lastVT = self._visitSite[site]
 		self._lock.release()
@@ -137,6 +138,6 @@ class Engine(object):
 		Return the last time a site was visited. 
 		"""
 		self._lock.acquire()
-		# site = hashlib.sha1(site).hexdigest()
+		site = hashlib.sha1(site).hexdigest()
 		self._visitSite[site] = time.time()
 		self._lock.release()

@@ -70,7 +70,7 @@ class DupEliminator(object):
 		"""
 		self._lock.acquire()
 		try:	
-			# url = hashlib.sha1(url).hexdigest()
+			url = hashlib.sha1(url).hexdigest()
 			visited = url in self._visited
 			if(not visited):
 				self._visited.add(url)
@@ -88,18 +88,3 @@ class DupEliminator(object):
 			return total
 		finally:
 			self._lock.release()
-
-	# def dump(self): #just for testing, will be removed eventually
-	# 	"""
-	# 	Dump the visited urls into ./log/visited.log
-	# 	"""
-	# 	import os
-	# 	if(not os.path.exists("log")):
-	# 		os.makedirs("log")
-	# 	output = open("log/visited.log", "w")
-	# 	self._lock.acquire()
-	# 	for item in self._visited:
-	# 		line = item.encode('utf8') + "\n"
-	# 		output.write(line)
-	# 	self._lock.release()
-	# 	

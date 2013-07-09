@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 from Queue import Queue, Empty, Full
 from threading import Thread
 from datetime import datetime 
-from urlparse import urljoin
+from urlparse import urlparse, urljoin
 
 import os
 import logging 
@@ -58,7 +58,8 @@ class Parser(Thread):
 				if link.has_attr('href'):
 					url = link['href']
 					url = urljoin(page.getURL(), url)
-					links.append(url)
+					if(urlparse(url).hostname is not None):
+						links.append(url)
 		except:
 			self.log(logging.WARNING, "Unable to parse " + page)
 		return links
