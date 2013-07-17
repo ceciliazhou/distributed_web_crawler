@@ -3,14 +3,15 @@ TO BE DONE
 """
 
 import urllib2
+import chardet
 from Queue import Queue, Empty, Full
 from threading import Thread
 from datetime import datetime 
-import os
 import logging
 import time
+import sys
 
-from page import Page
+# from page import Page
 
 class Downloader(Thread):
 	DEFAULT_USER_AGENT = "User-Agent: Mozilla/5.0"
@@ -19,11 +20,11 @@ class Downloader(Thread):
 	A Downloader is a thread that keeps downloading web pages until it's stopped.
 	"""
 
-	def __init__(self, urlQ, pageQ, logger = None, userAgent = DEFAULT_USER_AGENT, callbackFun = None):
+	def __init__(self, urlIn, pageQ, logger = None, userAgent = DEFAULT_USER_AGENT, callbackFun = None):
 		"""
 		Initialize a Downloader.
 		---------  Param --------
-		urlQ: (Queue) 
+		urlIn: (Queue) 
 			A queue storing the urls from which web pages are to be downloaded.
 		pageQ: (Queue)  		
 			A queue used for the downloader to store the downloaded pages.
@@ -36,7 +37,7 @@ class Downloader(Thread):
 		None
 		"""
 		super(Downloader, self).__init__()
-		self._urlQ = urlQ
+		self._urlIn = urlIn
 		self._pageQ = pageQ
 		self._userAgent = userAgent
 		self._logger = logger
@@ -46,7 +47,7 @@ class Downloader(Thread):
 		"""
 		Log info/warning/error message in log file.
 		"""
-		if(self._logger):
+		if(self._logger is not None):
 			if level == logging.INFO:
 				self._logger.info("[%s] INFO: %s" % (datetime.now(), msg))
 			elif level == logging.WARNING:
@@ -71,12 +72,15 @@ class Downloader(Thread):
 			page = urllib2.urlopen(request)
 			if(self._callbackFun is not None):
 				self._callbackFun(request.get_host())
-			content = page.read()
-			page.close()
-			if(content):
-				return Page(url, content)
+			html = page.read()
+			if(html is not None):
+				contentType = page.info().get("content-type")
+				charset =  contentType.split("charset=")[-1]
+				if contentType.find("charset") == -1:
+					charset = chardet.detect(html)['encoding']
+				return {"url":url, "html":html, "charset":charset}
 		except:
-			self.log(logging.WARNING, "Unable to open " + url)
+			self.log(logging.WARNING, str(sys.exc_info()[0]) + "Unable to open " + url)
 
 
 	def run(self):
@@ -85,13 +89,14 @@ class Downloader(Thread):
 		"""
 		while(True):
 			try:
-				url = self._urlQ.get(timeout = 2)
+				url = self._urlIn.get(timeout = 2)
 				if url is not None:
 					page = self.download(url)
 					if page and (not self._pageQ.full()):
 						self._pageQ.put(page, timeout = 2)
 			except Empty:
-				self.log(logging.WARNING, "urlQ is empty") 
+				self.log(logging.INFO, "urlIn is empty") 
 				time.sleep(5)
 			except Full:
-				self.log(logging.WARNING, "pageQ is full") 
+				self.log(logging.INFO, "pageQ is full") 
+				time.sleep(5)

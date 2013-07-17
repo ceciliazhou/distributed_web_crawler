@@ -4,7 +4,10 @@ This is a web crawler. It downloads and parses web pages starting with a given s
 
 Install
 ------------
-You may need to [install BeautifulSoup](http://www.crummy.com/software/BeautifulSoup/bs4/download/) to use this crawler, 
+Before you can run this crawler, you may have to download and install:
+	[BeautifulSoup](http://www.crummy.com/software/BeautifulSoup/bs4/download/)
+	[zmq core lib](http://download.zeromq.org/zeromq-3.2.3.tar.gz)
+	[zmq python binding](http://www.zeromq.org/bindings:python)
 as the parser thread uses BeautifulSoup to parse web pages. 
 
 Usage:

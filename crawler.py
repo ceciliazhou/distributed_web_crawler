@@ -1,32 +1,23 @@
 #!/usr/bin/python
 import sys
 from optparse import OptionParser
-from core.engine import Engine
-
-DEFAULT_SEEDS = "conf/seeds.cfg"
-DEFAULT_DOWNLOADERS = 4
-DEFAULT_PARSERS = 1
+from core.engine import Engine, MAX_URL_QSIZE, DEFAULT_REG_PORT, DEFAULT_MANAGER, DEFAULT_DOWNLOADERS
 
 def parseCommandLineArgs():
 	parser = OptionParser()
-	parser.add_option("-f", "--file", dest="file", default=DEFAULT_SEEDS,
-	                  help="the file which contains the web sites from which to start crawling, ./conf/seeds.cfg is used by default.")
+	parser.add_option("-m", "--manager", dest="manager", default=DEFAULT_MANAGER,
+	                  help="the name/ip of the host on which manager is started.")
+	parser.add_option("-p", "--port", dest="regPort", default=DEFAULT_REG_PORT,
+	                  help="port to connect manager.")
 	parser.add_option("-d", "--download", dest="downloaders", default=DEFAULT_DOWNLOADERS,
 	                  help="number of threads which download web pages. 4 by default.")
-	# parser.add_option("-p", "--parser", dest="parsers", default=DEFAULT_PARSERS,
-	#                   help="number of threads which parse web pages to extract links. (recommend: d/10???")
 	(options, args) = parser.parse_args()
-	fname = options.file
-	f = open(options.file, "r")
-	seeds = []
-	for line in f.readlines():
-		seeds.append(line.strip())
-	f.close()
-	return seeds, int(options.downloaders),  DEFAULT_PARSERS 
+
+	return options.manager, int(options.regPort), int(options.downloaders)
 
 def main():
-	seeds, downloaders, parsers  = parseCommandLineArgs()
-	engine = Engine(seeds, downloaders, parsers)
+	manager, port, downloaders  = parseCommandLineArgs()
+	engine = Engine(downloaders, manager, port)
 	engine.start()
 	raw_input("press any key to stop....\n")
 	engine.stop()

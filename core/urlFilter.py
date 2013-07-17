@@ -20,7 +20,7 @@ class RobotFilter(object):
 		TO BE DONE
 		"""
 		robotFile = urljoin(url, "/robots.txt")
-		key = hashlib.sha1(robotFile).hexdigest()
+		# key = hashlib.sha1(robotFile).hexdigest()
 		if(not self._dict.has_key(key)):
 			self._dict[key] = RobotFileParser(robotFile)
 			try:
@@ -70,7 +70,7 @@ class DupEliminator(object):
 		"""
 		self._lock.acquire()
 		try:	
-			url = hashlib.sha1(url).hexdigest()
+			# url = hashlib.sha1(url).hexdigest()
 			visited = url in self._visited
 			if(not visited):
 				self._visited.add(url)

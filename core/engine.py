@@ -1,17 +1,24 @@
 import os
 import logging
-from datetime import datetime
-from Queue import Queue
 import urllib2
-from threading import RLock, Timer
 import hashlib
 import time
+import zmq
+import socket
+from Queue import Queue
+from threading import Thread, RLock, Timer, Event
+from pymongo import MongoClient
 
 from downloader import Downloader
 from parser import Parser
 from lib.frontier import Frontier
 import urlFilter 
 
+DEFAULT_MANAGER = "127.0.0.1"
+DEFAULT_REG_PORT = 13000
+DEFAULT_DB_PORT = 27017
+
+DEFAULT_DOWNLOADERS = 4
 MAX_URL_QSIZE = 10000
 MAX_PAGE_QSIZE = 100
 
@@ -20,101 +27,153 @@ class Engine(object):
 	A Engine starts working by starting a number of downloader threads and a number of parser threads. 
 	It keeps crawling internet from a given set of seeds until being stopped.
 	"""
-	def __init__(self, seeds, nDownloader, nParser):
+	def __init__(self, nDownloader = DEFAULT_DOWNLOADERS, manager = DEFAULT_MANAGER, \
+		regPort = DEFAULT_REG_PORT, dbPort = DEFAULT_DB_PORT, urlPort = None, pagePort = None):
 		"""
 		Initialize a crawler object.
 		---------  Param --------
-		seeds (list(str)):
-			a list of urls from which to crawl the inernet.
 		nDownloader (int):
 			the nubmer of downloader threads.
-		nParser:
-			the number of parser threads.
+		manager:
+			the host on which manager is started.
+		regPort:
+			the port on which manager expects connection requests.
+		urlPort:
+			the port on which this worker sends url to manager.
+		pagePort:
+			the port on which this worker sends page to manager.
 
 		---------  Return --------
 		None.
 		"""
 		## prepare the url frontier and page queue
 		self._pageQ = Queue(MAX_PAGE_QSIZE)
-		self._urlQ = Frontier(3*nDownloader, MAX_URL_QSIZE, \
+		self._urlIn = Frontier(3*nDownloader, MAX_URL_QSIZE, \
 					keyFunc=lambda url: urllib2.Request(url).get_host(), \
 					priorityFunc=self.getLastVisitTime)
 		self._visitSite = {}
 		self._lock = RLock()
+		self._stopEvent = Event()
 
 		## prepare filters
 		filetypeFilter = urlFilter.FileTypeFilter(True, ['text/html'])
 		robotFilter = urlFilter.RobotFilter(Downloader.DEFAULT_USER_AGENT)
 		self._urlDupEliminator = urlFilter.DupEliminator()
-		self._urlQ.addFilter(self._urlDupEliminator.seenBefore)
-		# By inserting the seeds into urlQ before setting other Filters, 
-		# we are assuming the seeds in configure file are allowed by all filters. 
-		# In this way, we can speed up the initializtion period of the program very much.
-		for seed in seeds: 
-			self._urlQ.put(seed)
+		self._urlIn.addFilter(filetypeFilter.disallow)
+		self._urlIn.addFilter(self._urlDupEliminator.seenBefore)
+		# self._urlIn.addFilter(robotFilter.disallow)
 		
-		self._urlQ.addFilter(filetypeFilter.disallow)
-		self._urlQ.addFilter(robotFilter.disallow)
-		
+		## initialize sockets.
+		self._manager = manager
+		self._regPort = regPort
+		self._urlPort = urlPort
+		self._thisHost =  socket.gethostbyname(socket.gethostname())
+		self._dbclient = MongoClient(manager, dbPort)
+		context = zmq.Context()
+		self._regSocket = context.socket(zmq.REQ)
+		self._regSocket.connect("tcp://%s:%d" % (manager, self._regPort))
+		self._urlPushSocket = context.socket(zmq.PUSH)
+
+		self._urlPullSocket = context.socket(zmq.PULL)
+		if(self._urlPort is None):
+			self._urlPort = self._urlPullSocket.bind_to_random_port("tcp://%s" % self._thisHost)
+		else:
+			self._urlPullSocket.bind("tcp://*:%d" % (self._urlPort))
+
 		## prepare log files
 		if(not os.path.exists("log")):
 			os.makedirs("log")
-		downloadLogger = logging.getLogger("downloader")
-		downloadLogger.addHandler(logging.FileHandler(os.path.abspath("log/download.log")))
-		downloadLogger.setLevel(logging.INFO)
+		self._logger = logging.getLogger("engine")
+		self._logger.addHandler(logging.FileHandler(os.path.abspath("log/engine%d.log" % self._urlPort)))
+		self._logger.setLevel(logging.WARNING)
 		parseLogger = logging.getLogger("parser")
 		parseLogger.addHandler(logging.FileHandler(os.path.abspath("log/parser.log")))
-		parseLogger.setLevel(logging.INFO)
-				
+		parseLogger.setLevel(logging.WARNING)
+
 		## create threads for downloading and parsing tasks
 		self._downloaders = []
 		for i in range(nDownloader):
-			downloader = Downloader(self._urlQ, self._pageQ, downloadLogger, self.updateLastVisitTime)
+			downloader = Downloader(self._urlIn, self._pageQ, self._logger, self.updateLastVisitTime)
 			downloader.daemon = True
 			self._downloaders.append(downloader)
-		self._parsers = []
-		for i in range(nParser):
-			parser = Parser(self._pageQ, self._urlQ, parseLogger)
-			parser.daemon = True
-			self._parsers.append(parser)
+		self._parser = Parser(self._pageQ, self._urlPushSocket, self._dbclient, parseLogger)
+
+	def log(self, level, msg):
+		"""
+		Log info/warning/error message in log file.
+		"""
+		if(self._logger is not None):
+			if level == logging.INFO:
+				self._logger.info("[%s] INFO: %s" % (time.ctime(), msg))
+			elif level == logging.WARNING:
+				self._logger.warn("[%s] WARNING: %s" % (time.ctime(), msg))
+			else:
+				self._logger.error("[%s] ERROR: %s" % (tme.ctime(), msg))
+
+	def _register(self):
+		"""
+		Request connection to master. 
+		"""
+		self._regSocket.send("REG %s %d" % (self._thisHost, self._urlPort))
+		response = self._regSocket.recv()
+		managerurlPort = response.split()[1]
+		self.log(logging.INFO, "success to connect to manager:%s" % managerurlPort)
+		self._urlPushSocket.connect("tcp://%s:%s" % (self._manager, managerurlPort))
 
 	def start(self):
 		"""
 		Start crawling.
 		"""
-		print "[%s] : Crawler is started!" % datetime.now()
+		print "[%s] : Crawler is started!" %time.ctime()
+		self._register()
+		self._dataAcceptor = Thread(target = self._recvData)
+		self._dataAcceptor.daemon = True
+		self._dataAcceptor.start()
+
 		for downloader in self._downloaders:
 			downloader.start()
-		for parser in self._parsers:
-			parser.start()
+		self._parser.start()
+
+	def _recvData(self):
+		"""
+		Keeps listening to urlPort.
+		Process each arrival data.
+		"""
+		while(not self._stopEvent.isSet()):
+			urlSet = self._urlPullSocket.recv_pyobj()
+			self.log(logging.INFO, "received %s" % urlSet)
+			for url in urlSet:
+				self._urlIn.put(url)
 
 	def stop(self):
 		"""
 		Stop crawling.
 		"""
-		print "[%s] : Crawler is stopped!" %datetime.now()
-		self._statistic()
+		print "[%s] : Crawler is stopped!" %time.ctime()
+		self._stopEvent.set()
+		self._parser.stop()
+		self._parser.join()
+		self._regSocket.send("UNREG %s %d" % (self._thisHost, self._urlPort))
+		response = self._regSocket.recv()
+		self.log(logging.INFO, "received %s" % response)
 		self._dump()
 		
-	def _statistic(self):
-		"""
-		Output statistic info.
-		"""
-		total = self._urlDupEliminator.size()
-		left = self._urlQ.size()
-		print "%d url discovered, but only %d downloaded and %d ready for downloading." %(total, total-left, left)
-
 	def _dump(self):
 		"""
 		Dump the ready_to_be_crawled urls to log file.
 		"""
+		total = self._urlDupEliminator.size()
+		left = self._urlIn.size()
+		print "%d url discovered, but only %d downloaded and %d ready for downloading." %(total, total-left, left)
+		print "%d pages downloaded, BUT not sent to db" % self._pageQ.qsize()
+
 		import os
 		if(not os.path.exists("log")):
 			os.makedirs("log")
 		output = open("log/readyToBeVisited.log", "w")
 		
-		while(self._urlQ.size() > 0):
-			item = self._urlQ.get()
+		while(self._urlIn.size() > 0):
+			item = self._urlIn.get()
 			self.updateLastVisitTime(urllib2.Request(item).get_host())
 			item = "" if item is None else item
 			line = item.encode('utf8') + "\n"
