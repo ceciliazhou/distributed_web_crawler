@@ -88,7 +88,6 @@ class Parser(Thread):
 				for link in self.parse(page):
 					self._urlOut.add(link)
 					if(len(self._urlOut) >= MIN_URL_MSG_SIZE):
-						self._dataPushSocket.send("URL", zmq.SNDMORE)
 						self._dataPushSocket.send_pyobj(self._urlOut)
 						self.log(logging.INFO, "sending %s" % self._urlOut)
 						self._urlOut.clear()

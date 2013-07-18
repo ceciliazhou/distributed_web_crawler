@@ -4,20 +4,20 @@ TO DO
 """
 
 import zmq
-# from pymongo import MongoClient
 import chardet
 import os
 import logging
 import time
-from threading import Thread, RLock
+from threading import Thread, RLock, Event
 from urlparse import urlparse
+from pymongo import MongoClient
 
 DEFAULT_REG_PORT = 13000
 DEFAULT_DATA_PORT = 13001
 DEFAULT_DB_PORT = 27017
 MIN_MSG_DATA = 5
 
-class Manager(object):
+class CrawlerManager(object):
 	"""
 	A manager accepts connections from worker workers, updates workers' info,
 	collect data from connected workers and dispatch jobs among them in a load-balanced way.
@@ -39,6 +39,7 @@ class Manager(object):
 		self._workerIDs = []
 		self._buffer = set() if initialData is None else initialData
 		self._lock = RLock()
+		self._stopEvent = Event()
 
 		## prepare logger
 		if(not os.path.exists("log")):
@@ -46,6 +47,14 @@ class Manager(object):
 		self._logger = logging.Logger("manager")
 		self._logger.addHandler(logging.FileHandler(os.path.abspath("log/manager.log")))
 		self._logger.setLevel(logging.WARNING)
+
+		## load unfinished urls from database
+		self._dbconn = MongoClient()
+		unvisited = self._dbconn.crawler.unvisited.find()
+		self._log(logging.INFO, "loading %d urls from database." % unvisited.count())
+		for record in unvisited:
+			self._buffer.add(record['url'])
+		self._dbconn.crawler.unvisited.drop()
 
 		## initialize sockets.
 		self._context = zmq.Context()
@@ -76,20 +85,26 @@ class Manager(object):
 		connAcceptor = Thread(target = self._acceptConnections)
 		connAcceptor.daemon = True
 		connAcceptor.start()
-		dataReceiver = Thread(target = self._recvData)
-		dataReceiver.daemon = True
-		dataReceiver.start()
-		dataProcessor = Thread(target = self._processData)
-		dataProcessor.daemon = True
-		dataProcessor.start()
+		self._dataReceiver = Thread(target = self._recvData)
+		self._dataReceiver.daemon = True
+		self._dataReceiver.start()
+		self._dataDistributor = Thread(target = self._distributeData)
+		self._dataDistributor.daemon = True
+		self._dataDistributor.start()
 
+	def stop(self):
+		self._stopEvent.set()
+		self._log(logging.INFO, "saving %d unvisited urls into database ..." % len(self._buffer))
+		self._lock.acquire()
+		self._dbconn.crawler.unvisited.insert([{'url':url} for url in self._buffer])
+		self._lock.release()
 
 	def _acceptConnections(self):
 		"""
 		Keeps listening to _regPort. 
 		On each arrival connection request, accepts and replies with the port number on which manager expects data.
 		"""
-		while(True):
+		while(not self._stopEvent.isSet()):
 			connectionReq = self._regSocket.recv()
 			req, host, port = connectionReq.split()
 			self._log(logging.INFO, "Received %s request from %s which expects data on %s" % (req, host, port))
@@ -117,30 +132,27 @@ class Manager(object):
 		Process each arrival data report and dispatch jobs if necessary, 
 		e.g. when getting enough data for dispatching a job to some worker.
 		"""
-		while(True):
-			msgType = self._dataPullSocket.recv()
-			if self._dataPullSocket.getsockopt(zmq.RCVMORE):
-				self._log(logging.INFO, "received %s" % (msgType))
-				data = self._dataPullSocket.recv_pyobj()
-				if msgType.upper() == "URL":
-					self._lock.acquire()
-					self._buffer.update(data)
-					self._lock.release()
+		while(not self._stopEvent.isSet()):
+			data = self._dataPullSocket.recv_pyobj()
+			self._log(logging.INFO, "received %d urls" % len(data))			
+			self._lock.acquire()
+			self._buffer.update(data)
+			self._lock.release()
 
-	def _processData(self):
+	def _distributeData(self):
 		"""
 		Process data (a set of data) received from worker workers.
 		"""
 		## TO DO: 
 		## 1. workerdataSet.put(data)
 		## 2. only if the workerdataSet is filled with enough data, send out to the responding worker worker.
-		while(True):
+		while(not self._stopEvent.isSet()):
 			if(len(self._buffer) == 0 or len(self._workerInfo) == 0):
 				time.sleep(2)
 				continue
 
 			self._lock.acquire()
-			while(len(self._buffer) > 0):
+			while(not self._stopEvent.isSet() and len(self._buffer) > 0):
 				url = self._buffer.pop()
 				site = urlparse(url).hostname
 				targetworker = self._matchWorker(site)
@@ -168,30 +180,34 @@ class Manager(object):
 		workerID = hash(site) % len(self._workerIDs)
 		return self._workerIDs[workerID]
 
-DEFAULT_SEEDS = "conf/seeds.cfg"
+# DEFAULT_SEEDS = "conf/seeds.cfg"
 
 def parseCommandLineArgs():
 	from optparse import OptionParser
 	parser = OptionParser()
-	parser.add_option("-f", "--file", dest="file", default=DEFAULT_SEEDS,
+	parser.add_option("-f", "--file", dest="file", default=None,
 	                  help="the file which contains the web sites from which to start crawling, ./conf/seeds.cfg is used by default.")
 	parser.add_option("-p", "--port", dest="regPort", default=DEFAULT_REG_PORT,
 	                  help="port on which connection requests are expected.")
 	parser.add_option("-d", "--urlPort", dest="urlPort", default=DEFAULT_DATA_PORT,
 	                  help="port on which urls are sent to workers.")
+
 	(options, args) = parser.parse_args()
-	fname = options.file
-	f = open(options.file, "r")
 	seeds = set()
-	for line in f.readlines():
-		seeds.add(line.strip())
-	f.close()
+	if options.file is not None:
+		f = open(options.file, "r")
+		for line in f.readlines():
+			seeds.add(line.strip())
+		f.close()
+
 	return seeds, int(options.regPort), int(options.urlPort)
 
 def main():
 	seeds, regPort, urlPort  = parseCommandLineArgs()
-	Manager(seeds, regPort, urlPort).start()
+	manager = CrawlerManager(seeds, regPort, urlPort)
+	manager.start()
 	raw_input("press any key to stop....\n")
+	manager.stop()
 			
 if __name__ == "__main__":
 	main()

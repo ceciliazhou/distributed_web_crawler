@@ -48,7 +48,7 @@ class Engine(object):
 		"""
 		## prepare the url frontier and page queue
 		self._pageQ = Queue(MAX_PAGE_QSIZE)
-		self._urlIn = Frontier(3*nDownloader, MAX_URL_QSIZE, \
+		self._urlFrontier = Frontier(3*nDownloader, MAX_URL_QSIZE, \
 					keyFunc=lambda url: urllib2.Request(url).get_host(), \
 					priorityFunc=self.getLastVisitTime)
 		self._visitSite = {}
@@ -59,9 +59,9 @@ class Engine(object):
 		filetypeFilter = urlFilter.FileTypeFilter(True, ['text/html'])
 		robotFilter = urlFilter.RobotFilter(Downloader.DEFAULT_USER_AGENT)
 		self._urlDupEliminator = urlFilter.DupEliminator()
-		self._urlIn.addFilter(filetypeFilter.disallow)
-		self._urlIn.addFilter(self._urlDupEliminator.seenBefore)
-		# self._urlIn.addFilter(robotFilter.disallow)
+		self._urlFrontier.addFilter(filetypeFilter.disallow)
+		self._urlFrontier.addFilter(self._urlDupEliminator.seenBefore)
+		# self._urlFrontier.addFilter(robotFilter.disallow)
 		
 		## initialize sockets.
 		self._manager = manager
@@ -93,7 +93,7 @@ class Engine(object):
 		## create threads for downloading and parsing tasks
 		self._downloaders = []
 		for i in range(nDownloader):
-			downloader = Downloader(self._urlIn, self._pageQ, self._logger, self.updateLastVisitTime)
+			downloader = Downloader(self._urlFrontier, self._pageQ, self._logger, self.updateLastVisitTime)
 			downloader.daemon = True
 			self._downloaders.append(downloader)
 		self._parser = Parser(self._pageQ, self._urlPushSocket, self._dbclient, parseLogger)
@@ -143,7 +143,10 @@ class Engine(object):
 			urlSet = self._urlPullSocket.recv_pyobj()
 			self.log(logging.INFO, "received %s" % urlSet)
 			for url in urlSet:
-				self._urlIn.put(url)
+				try:
+					self._urlFrontier.put(url)
+				except Full:
+					time.sleep(5)
 
 	def stop(self):
 		"""
@@ -153,32 +156,25 @@ class Engine(object):
 		self._stopEvent.set()
 		self._parser.stop()
 		self._parser.join()
+		self._dump()
 		self._regSocket.send("UNREG %s %d" % (self._thisHost, self._urlPort))
 		response = self._regSocket.recv()
 		self.log(logging.INFO, "received %s" % response)
-		self._dump()
 		
 	def _dump(self):
 		"""
 		Dump the ready_to_be_crawled urls to log file.
 		"""
 		total = self._urlDupEliminator.size()
-		left = self._urlIn.size()
+		left = self._urlFrontier.size()
 		print "%d url discovered, but only %d downloaded and %d ready for downloading." %(total, total-left, left)
-		print "%d pages downloaded, BUT not sent to db" % self._pageQ.qsize()
 
-		import os
-		if(not os.path.exists("log")):
-			os.makedirs("log")
-		output = open("log/readyToBeVisited.log", "w")
-		
-		while(self._urlIn.size() > 0):
-			item = self._urlIn.get()
-			self.updateLastVisitTime(urllib2.Request(item).get_host())
-			item = "" if item is None else item
-			line = item.encode('utf8') + "\n"
-			output.write(line)
-		output.close()
+		unvisited = set()
+		while(self._urlFrontier.size() > 0):
+			unvisited.add(self._urlFrontier.get())
+
+		self._urlPushSocket.send_pyobj(unvisited)
+		unvisited.clear()
 		
 	def getLastVisitTime(self, site):
 		"""
