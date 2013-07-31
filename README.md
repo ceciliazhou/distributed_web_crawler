@@ -1,58 +1,43 @@
 About
 ------------
-This is a web crawler. It downloads and parses web pages starting with a given set of web sites which is called seeds. 
+This web crawler consists of a manager and a bunch of workers which can work in single-node mode or cluster mode. Each worker downloads web pages and communicates the server with urls extracted from the downloaded pages. Manager is responsible for scheduling crawling tasks among the workers with consideration of load balance. Manager also handles dynamically connected/disconnected workers. 
 
-Install
+Installation Dependencies
 ------------
-Before you can run this crawler, you may have to download and install:
-	[BeautifulSoup](http://www.crummy.com/software/BeautifulSoup/bs4/download/)
-	[zmq core lib](http://download.zeromq.org/zeromq-3.2.3.tar.gz)
-	[zmq python binding](http://www.zeromq.org/bindings:python)
-as the parser thread uses BeautifulSoup to parse web pages. 
+Before you can run this crawler, you may need to download and install:
 
-Usage:
-------------	
-	crawler.py [options]
-	
-	Options:
-	  -h, --help
-		show this help message and exit
+1. [BeautifulSoup](http://www.crummy.com/software/BeautifulSoup/bs4/download/)
+2. [zmq core lib](http://zeromq.org/area:download) and [pyzmq](http://zeromq.org/bindings:python)
+3. [mongodb](http://docs.mongodb.org/manual/installation/) and [pymongo](http://api.mongodb.org/python/current/installation.html)
 
-  	  -f FILE, --file=FILE  
-  	  	the file which contains the web sites from which to start crawling. ./conf/seeds.cfg is used by default.
- 
-	  -d DOWNLOADERS, --download=DOWNLOADERS
-		number of threads which download web pages. 4 by default.
-	
+
+Try it:
+--------
+1. Start the manager on master node.
+
+		Usage: crawlerManager.py [options]
+		Options:
+		  -h, --help            show this help message and exit
+		  -f FILE, --file=FILE  the file which contains the web sites from which to
+		                        start crawling, ./conf/seeds.cfg is used by default.
+		  -p REGPORT, --port=REGPORT
+		                        port on which connection requests are expected.
+		  -d URLPORT, --urlPort=URLPORT
+		                        port on which urls are sent to workers.
+
+2. Start workers on master or any other hosts.
+
+		Usage: crawlerWorker.py [options]
+		Options:
+		  -h, --help            show this help message and exit
+		  -m MANAGER, --manager=MANAGER
+		                        the name/ip of the host on which manager is started.
+		  -p REGPORT, --port=REGPORT
+		                        port to connect manager.
+		  -d DOWNLOADERS, --download=DOWNLOADERS
+		                        number of threads which download web pages. 4 by
+		                        default.
+
 Desgin:
-------------	
-- ***Engine***
-
-	The main component of a crawler. The job of an engine consists of:
-	1. initializes two queues: urlQ (using our own Frontier) storing urls, pageQ (using the standard Queue)
-	   storing downloaded web pages.
-	2. starts/stops the configured number of downloader threads and parser threads.
-	
-- ***Downloader***
-
-	Downloader keeps fetching url from the urlQ and downloading web pages located that url 
-	only if the url hasn't been visited before.
-	Everytime a pages is downloaded, it will be put into the pageQ for parsing.
-	
-- ***Parser***
-
-	Parser keeps fetching page from pageQ and exacting links by parsing the html tags.
-	All the extracted links will be put into the urlQ for downloading.
-	
-- ***Frontier***
-
-	Frontier maintains urls in two queues: frontQ (input) and backQ (output)
-	1. url is accepted (by put()) and pushed into frontQ if only the url survives the registered 
-	   filter routines, includeing duplicate eliminator.
-	2. url is grouped by host in backQ. That is, each queue in backQ corresponds to one site. 
-	3. url is always extracted (by get()) from the group which has the highest priority. 
-	   This is important because we can configure as the priority the last time we visited the site 
-	   corresponding to the group/queue, so that we always exact a url of the site hasn't been visited 
-	   for the longest time.
-	4. The Frontier is designed for general purpose, not specific for the crawler. 
-	   For more details, please check out core.frontier.
+------------
+![design.png](https://raw.github.com/ceciliazhou/distributed_web_crawler/master/design.png)
