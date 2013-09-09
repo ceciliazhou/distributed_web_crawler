@@ -38,6 +38,6 @@ Try it:
 		                        number of threads which download web pages. 4 by
 		                        default.
 
-Desgin:
+Design:
 ------------
 ![design.png](https://raw.github.com/ceciliazhou/distributed_web_crawler/master/design.png)
